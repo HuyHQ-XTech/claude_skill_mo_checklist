@@ -41,6 +41,14 @@ def main():
         print(f"Skill ở {SKILL_DIR} không phải git repo → không cập nhật tự động được.\n"
               "Cài lại bằng git clone (xem README.md của skill).")
         return 0 if check_only else 1
+    _, branch, _ = git("branch", "--show-current")
+    if branch and branch != "main":
+        if check_only:
+            print(f"(mo-checklist đang ở nhánh '{branch}' — bạn đang đóng góp, bỏ qua kiểm bản mới.)")
+            return 0
+        print(f"Đang ở nhánh '{branch}'. Update chỉ áp cho main:\n  git -C \"{SKILL_DIR}\" checkout main\n"
+              "rồi chạy lại /mo-checklist update. (Đang làm dở trên nhánh thì commit/push trước.)")
+        return 1
     code, upstream, _ = git("rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}")
     if code != 0:
         print("Nhánh hiện tại chưa gắn upstream (git branch --set-upstream-to origin/main).")

@@ -1,5 +1,18 @@
 # CHANGELOG — skill mo-checklist
 
+## 1.2.0 — 2026-10-12
+
+- **Cho phép nhiều người cùng đóng góp:** thêm `CONTRIBUTING.md`.
+  - Quy trình: sửa trên nhánh riêng → `scripts/ci_check.py` → Pull Request → người bảo trì review.
+  - Kèm mẫu PR, `CODEOWNERS`, CI GitHub Actions (job `check`).
+- **CI chặn:**
+  - catalog lỗi;
+  - CATALOG.md chưa render;
+  - commit `local.json`;
+  - ID quảng cáo thật;
+  - thay đổi nội dung mà chưa tăng phiên bản / thiếu CHANGELOG.
+- **`/mo-checklist update`:** khi đang ở nhánh đóng góp thì không nhắc/không pull. Muốn update phải về `main`.
+
 ## 1.1.0 — 2026-10-12
 
 - **Phân phối qua git:** dev clone vào `~/.claude/skills/mo-checklist`, gõ `/mo-checklist update` để kéo bản

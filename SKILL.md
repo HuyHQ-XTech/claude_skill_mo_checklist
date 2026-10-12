@@ -5,7 +5,7 @@ description: Làm / kiểm tra MO checklist (tactic Monetization) cho các app A
 
 # mo-checklist — làm MO checklist đồng bộ cho các app Android xTech
 
-Phiên bản **1.1.0** (2026-10-12) — thay đổi ghi ở `CHANGELOG.md`. Skill phân phối qua git: `/mo-checklist update` để
+Phiên bản **1.2.0** (2026-10-12) — thay đổi ghi ở `CHANGELOG.md`. Skill phân phối qua git: `/mo-checklist update` để
 kéo bản mới (xem `README.md`).
 
 Trước đây mỗi app tự làm MO checklist theo một kiểu, mỗi ticket lại "Ref" một app khác. Skill này là
@@ -227,7 +227,8 @@ Dùng `catalog.py show <ID>` + section recipe, rồi giải thích bằng lời 
    - xem chi tiết: `git -C <A013> diff <verified_commit> -- <file>`;
    - sửa lời recipe (vẫn không chép code);
    - cập nhật `canonical.verified_commit` của mục đó (và `meta.verified_commit` nếu đối chiếu cả loạt).
-5. Chạy `catalog.py check` rồi `catalog.py render`.
+5. Chạy `catalog.py check` rồi `catalog.py render`, cuối cùng `scripts/ci_check.py` (tăng phiên bản +
+   CHANGELOG). Quy trình nhánh/PR: `CONTRIBUTING.md`.
 
 ## Luật cứng
 1. **Mỗi mục một cách làm chuẩn.** Ref mặc định A013; ref khác chỉ khi user chọn, và **luôn kèm bảng khác

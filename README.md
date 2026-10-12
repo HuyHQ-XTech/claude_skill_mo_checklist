@@ -19,6 +19,7 @@ cách chuẩn chung**. Không còn cảnh mỗi app tự làm một kiểu, mỗ
 6. [Xử lý sự cố](#6-xử-lý-sự-cố)
 7. [Cấu trúc thư mục](#7-cấu-trúc-thư-mục)
 8. [Dành cho người bảo trì](#8-dành-cho-người-bảo-trì)
+9. [Đóng góp](#9-đóng-góp)
 
 ---
 
@@ -166,9 +167,10 @@ hoặc chạy tay: `git -C ~/.claude/skills/mo-checklist pull --ff-only`.
 
 - Mỗi lần dùng, Claude tự kiểm và **nhắc khi có bản mới**. Nó không tự cập nhật giữa chừng.
 - Update xong sẽ in phiên bản cũ → mới và phần CHANGELOG mới.
-- **Đừng sửa file trong thư mục skill trên máy mình.** Có sửa đổi local thì update dừng lại để khỏi mất.
-  - Muốn góp ý/sửa: mở issue/PR trên repo, hoặc nhắn người bảo trì.
+- **Đừng sửa file trong thư mục skill trên nhánh `main`.** Có sửa đổi local thì update dừng lại để khỏi mất.
+  - Muốn góp ý/sửa: làm theo [`CONTRIBUTING.md`](CONTRIBUTING.md) (sửa trên nhánh riêng rồi mở PR).
   - Lỡ sửa và muốn bỏ: `git -C ~/.claude/skills/mo-checklist stash`, rồi update lại.
+- Đang ở nhánh đóng góp thì skill không nhắc cập nhật. Muốn update: `git checkout main` trước.
 
 ---
 
@@ -206,7 +208,10 @@ mo-checklist/
 │   ├── detect_stack.py   # nhận diện stack app, lệnh build, JDK gợi ý
 │   ├── audit.py          # dò mục MO đã có/thiếu, so app chuẩn với app ref
 │   ├── sheet_diff.py     # (bảo trì) so sheet MO mới với catalog
-│   └── update.py         # cập nhật skill
+│   ├── update.py         # cập nhật skill
+│   └── ci_check.py       # kiểm trước khi merge (chạy ở GitHub Actions)
+├── .github/              # CI (workflows/check.yml), CODEOWNERS, mẫu PR
+├── CONTRIBUTING.md       # hướng dẫn đóng góp
 └── assets/
     ├── refs/             # ảnh minh hoạ trích từ sheet MO (MO-<dòng>-n.jpg)
     └── noti-content.md   # copy noti theo app (snapshot sheet)
@@ -237,7 +242,8 @@ mo-checklist/
    - **minor** (1.**2**.0): thêm mục, thêm tính năng;
    - **major** (**2**.0.0): đổi luật hoặc quy trình.
 4. Thêm mục mới **lên đầu** `CHANGELOG.md`. Dev thấy đúng phần này khi update, nên viết cho họ đọc.
-5. Commit và push lên `main`:
+5. Chạy `python3 scripts/ci_check.py` (phải ✅), rồi commit + push lên `main`, hoặc merge PR của người
+   đóng góp:
    ```bash
    git add -A && git commit -m "mo-checklist x.y.z: <tóm tắt>" && git push
    ```
@@ -258,3 +264,12 @@ Chạy `python3 scripts/audit.py --app a013`. Mục nào báo `↺` thì:
 1. xem `git -C <A013> diff <verified_commit> -- <file>`;
 2. sửa lời recipe;
 3. cập nhật `verified_commit` của mục trong `catalog.json`.
+
+---
+
+## 9. Đóng góp
+
+Ai cũng góp được: báo lỗi bằng Issue, hoặc tự sửa trên nhánh riêng rồi mở Pull Request. Mọi PR được CI
+(`scripts/ci_check.py`) kiểm tự động và người bảo trì review trước khi vào `main`.
+
+Hướng dẫn từng bước + luật nội dung: [`CONTRIBUTING.md`](CONTRIBUTING.md).
