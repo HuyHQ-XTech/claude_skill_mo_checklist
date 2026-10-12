@@ -1,0 +1,119 @@
+{
+ "root": null,
+ "root_env": "MO_APPS_ROOT",
+ "note": "dir: tên thư mục repo (null = chưa có repo trên máy). remote: để clone khi máy chưa có. Thư mục chứa các repo được tìm theo thứ tự: env MO_APPS_ROOT → local.json (\"root\", file riêng từng máy, không commit) → thư mục cha của repo đang mở.",
+ "apps": {
+  "a013": {
+   "name": "ReVive (Recovery)",
+   "dir": "A013_Recovery_Asclepius",
+   "ref": true,
+   "remote": "git@github.com:xTech-Android/A013_Recovery_Asclepius.git"
+  },
+  "a014": {
+   "name": "Nest AI",
+   "dir": "A014_Nest_AI",
+   "remote": "https://github.com/xTech-Android/A014_Nest_AI.git"
+  },
+  "a016": {
+   "name": "GPS inhouse",
+   "dir": "a016_GPS_Kinglets",
+   "remote": "git@github.com:xTech-Android/a016_GPS_Kinglets.git"
+  },
+  "a018": {
+   "name": "GPS partner",
+   "dir": null
+  },
+  "a027": {
+   "name": "Resto (Recovery inhouse)",
+   "dir": "a27_Recovery_inhouse",
+   "aliases": [
+    "a27"
+   ],
+   "remote": "git@github.com:xTech-Android/a27_Recovery_inhouse.git"
+  },
+  "a028": {
+   "name": "Casto (Cast TV)",
+   "dir": "A028_Cast_TV_inhouse",
+   "remote": "git@github.com:xTech-Android/A028_Cast_TV_inhouse.git"
+  },
+  "a031": {
+   "name": "Muslim pray (Qibla)",
+   "dir": "qibla-compass---Xtech",
+   "remote": "git@github.com:Code-Connect-Technologies/qibla-compass---Xtech.git"
+  },
+  "a032": {
+   "name": "AR Drawing",
+   "dir": null
+  },
+  "a033": {
+   "name": "PDF Reader",
+   "dir": "PDF-Reader-App-tech-Town",
+   "remote": "git@github.com:Code-Connect-Technologies/PDF-Reader-App-tech-Town.git"
+  },
+  "a034": {
+   "name": "HD Camera",
+   "dir": "a034_HDCamera_inhouse",
+   "remote": "git@github.com:xTech-Android/a034_HDCamera_inhouse.git"
+  },
+  "a036": {
+   "name": "Remote TV",
+   "dir": "a036_Remote-TV_inhouse",
+   "remote": "https://github.com/xTech-Android/a036_Remote-TV_inhouse.git"
+  },
+  "a037": {
+   "name": "Speaker cleaner",
+   "dir": "a037_Speaker_Cleaner",
+   "remote": "git@github.com:xTech-Android/a037_Speaker_Cleaner.git"
+  },
+  "a038": {
+   "name": "Keyboard theme",
+   "dir": null
+  },
+  "a039": {
+   "name": "Battery Emoji",
+   "dir": "a039_BatteryEmoji",
+   "remote": "git@github.com:xTech-Android/a039_BatteryEmoji.git"
+  },
+  "a040": {
+   "name": "PS5 Controller",
+   "dir": null
+  },
+  "a041": {
+   "name": "Lernix AI learn (Duo Speak)",
+   "dir": "Duo-Speak-Ai-Translate-and-Tutor---Archers",
+   "remote": "git@github.com:Code-Connect-Technologies/Duo-Speak-Ai-Translate-and-Tutor---Archers.git"
+  },
+  "a042": {
+   "name": "Langofy",
+   "dir": "Langofy---Ai-Tutor-CCT",
+   "remote": "git@github.com:Code-Connect-Technologies/Langofy---Ai-Tutor-CCT.git"
+  },
+  "a044": {
+   "name": "Home AI 02",
+   "dir": "a044_Home_AI_02",
+   "remote": "git@github.com:xTech-Android/a044_Home_AI_02.git"
+  },
+  "a045": {
+   "name": "ByteClean",
+   "dir": "A045_ByteClean",
+   "remote": "git@github.com:xTech-Android/A045_ByteClean.git"
+  },
+  "a047": {
+   "name": "Tarot Reader",
+   "dir": "A47_Tarot-Reader",
+   "aliases": [
+    "a47"
+   ],
+   "remote": "git@github.com:xTech-Android/A47_Tarot-Reader.git"
+  },
+  "a049": {
+   "name": "(chưa có code)",
+   "dir": "a049"
+  },
+  "sdk": {
+   "name": "xTechSDK (xtechads)",
+   "dir": "xTechSDK",
+   "remote": "git@github.com:xTech-Android/xTechSDK.git"
+  }
+ }
+}

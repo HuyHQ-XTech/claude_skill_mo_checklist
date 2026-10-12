@@ -1,0 +1,7 @@
+# file riêng từng máy
+local.json
+# rác
+__pycache__/
+*.pyc
+.staging/
+.DS_Store
