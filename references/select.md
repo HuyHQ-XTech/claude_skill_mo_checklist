@@ -95,7 +95,9 @@ Recipe chuẩn cho nhóm `select`: MO-43..MO-51, DEV-10, CC-4.
 - **Remote config:** các key trong bảng trên. Alias:
   - a027: `select_loading` (`false`), `show_select` (`true` = có màn Select), `select_btn_skip`,
     `buffer_select_alt`, `min_ad_interval_select_alt`.
-  - A045: `select_btn_skip` (`true`); `native_full_pre_auto_pass_time` default `15`.
+  - A045 từ v1.0.9 gom `select_config`: `btn_skip` (`true`), `buffer_alt` (`false`), `min_ad_interval_alt`
+    (`1000`), `preparing.countdown_time` (`5`), `preparing.auto_pass_time` (`10`). Trước đó key phẳng
+    `select_btn_skip`, `native_full_pre_auto_pass_time` (`15`).
   - a016: `show_small_button_select` (`false`), `use_new_select_screen` (`false`). a034: `is_use_new_select`
     (`true`). a033: `select_screen_text_action` (`true`).
 - **Placement / tracking:**
@@ -112,10 +114,28 @@ Recipe chuẩn cho nhóm `select`: MO-43..MO-51, DEV-10, CC-4.
   5. Skip / Preparing: đọc `NativePreparingScreen` và `NativeFullPreparingView` ở A013 (bản hiện tại).
   - Không SDK (A028, a036, a041): 2 `NativeAdUnit` riêng, như language.md § MO-35. XML/Fragment: như
     language.md.
+  - App đã làm: A049 (10/2026), bước Select là màn nhập tên + giới tính (`ui/screen/name/`, `NameViewModel`):
+    - ScrName (native `select`) → chạm ô tên hoặc chạm 1 giới tính → sang ScrNameAlt (native `select_alt`, nạp sẵn
+      lúc vào ScrName qua `AdsManager.preloadSelectAlt`). Ô tên ở ScrName không nhận focus (lớp chạm phủ lên, giữ
+      testTag cho test tự động); chỉ lượt chạm ô tên mới focus ô tên ở Alt và bật bàn phím. User chốt 16/10, trước
+      đó phải gõ ký tự đầu mới sang Alt.
+    - Giới tính chọn sẵn mặc định; `BtnNext` (và vuốt tiếp) chỉ đi khi tên không rỗng, log `selected_gender`.
+    - Hai màn dùng chung `NameViewModel` + back stack con như Language (MO-35). Back ở cả 2 màn chỉ bị nuốt.
+    - Alt không đổi native khi đổi giới tính hay sửa tên → chưa đạt dòng nghiệm thu "chọn mục khác ở màn 2 → native
+      đổi"; không có Skip / Preparing.
 - **Bẫy:**
   - `SelectType.items` là list toàn cục → phải xoá trong `resetState` (A013 có làm), nếu không lần FO sau
     còn mục cũ.
   - `resetAdsBeforeSelect` chỉ nên giải phóng ad của các màn mà luồng thực sự đã đi qua.
+  - Màn select có ô nhập (A049 Name: tên + giới tính), bàn phím làm native giật:
+    - `NativeBannerGroupView` của SDK `remember(modifier, stableHeightPx)`: modifier dựng inline có lambda thì mỗi lần
+      recompose (mỗi ký tự gõ) native bị đo lại → `remember` modifier.
+    - Đừng đổi kích thước hay gỡ native lúc IME đang chạy (`animateContentSize`, thu về 0 rồi trả lại: 50–75ms mỗi lần
+      đo lại trên máy yếu). Phím đã che ad thì `graphicsLayer` alpha 0 + lớp chặn chạm.
+    - App ẩn thanh điều hướng: IME bật lại thanh này (có animation) → `navigationBarsPadding()` trên ô ad làm ad đổi
+      cỡ từng khung → giữ cố định padding trong lúc IME chạy.
+    - Mẫu: A049 `ui/screen/name/content/NameContent.kt` (`adModifier`, `adHidden`, `adSlotPadding`,
+      `NavPaddingFreeze`); đo trên Meizu, khung jank 72% → 21%.
 - **QC:** đi FO tới Select; logcat có `iaa_impression` `select` rồi `select_alt`. Bật `select_loading_enabled`
   → có màn loading. Bấm Skip → Preparing đếm 5 giây, hiện X, rồi tự qua.
 

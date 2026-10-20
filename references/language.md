@@ -76,6 +76,41 @@ a041. Giữ kiểu app đang có.
 Màn Language Setting (`LanguageSettingScreen`, `LanguageType.Setting`) **không** áp tactic FO: không ngón
 tay, popup, buffer.
 
+**Ref A048 (khác A013 ở nhiều chỗ, ghi ở từng mục; A049 làm theo A048)**
+- Code tính từ `app/src/main/java/com/ai/live/translator/`:
+  - `ui/screen/language/`: `LanguageNavigation` (NavDisplay lồng), `LanguageViewModel` (state + logic cả 2 màn),
+    `normal/LanguageScreen`, `alternative/LanguageAltScreen` (buffer MO-98), `view/LanguageContent` (list, nút tick,
+    2 ngón tay), `state/LanguageState`.
+  - `domain/language/LanguageManager.kt`, `ui/dialog/ConfirmLanguageDialog.kt`, `domain/preference/RcGroup.kt`.
+- RC gom JSON `language_config`, đọc qua `RcGroup`: `order` (DEV-6), `finger_position` (MO-36), `tick.size` (kẹp
+  16–64), `tick.color`. Buffer MO-98 vẫn là key phẳng. a037 cùng nhóm, thêm `tick.color_active`, `buffer_alt`,
+  `min_ad_interval_alt`. A049 gom cả buffer vào `language_config` như a037.
+- Một popup `ConfirmLanguageDialog` (placement `native_popup_lang`) dùng cho cả back (MO-86) lẫn chạm lại (MO-94).
+
+**Bẫy chung: RTL và locale**
+- Đổi ngôn ngữ trong app không recreate Activity (A013, A048 `updateLanguage` chỉ `updateConfiguration`). Root phải bọc
+  `CompositionLocalProvider(LocalLayoutDirection provides …)` đọc từ state ngôn ngữ app: A013 `MainActivity` +
+  `LanguageManager.isRtlLayout`, A048 `LanguageManager.layoutDirection`. Thiếu thì chọn Arabic xong chỉ đổi chữ, layout
+  vẫn trái→phải tới lần mở app sau.
+- Phần vẽ cố định một phía phải tự lật khi RTL:
+  - ảnh + gradient nền (A049 Home `HeroCard`: `graphicsLayer` `scaleX = -1` khi RTL);
+  - cử chỉ vuốt tự viết (A049 `rememberSwipeToFinishConnection` đổi dấu theo `LocalLayoutDirection`);
+  - icon vector có hướng cần `android:autoMirrored` mới tự lật (A048 `ic_arrow_left` ở header Language Setting đang
+    thiếu; A013 cũng không có; A049 thêm cho `ic_arrow_left` / `ic_arrow_right` ngày 15/10/2026).
+- `Locale.getDefault()` có thể lệch ngôn ngữ app giữa phiên (A049 Birth: tên tháng tiếng Anh trong UI tiếng Đức).
+  - Ngày, số, tên tháng đừng lấy theo `Locale.getDefault()`. A049 dùng `LocalConfiguration.current.locales[0]`
+    (`ui/properties/LocalizedDate.kt` — `rememberDateFormatter`).
+  - `LocalConfiguration` chỉ đổi khi có configuration change (Compose `AndroidComposeView`; API 32–33 đọc lại sau mỗi
+    layout). Phiên vừa đổi ngôn ngữ (không recreate) nó vẫn là ngôn ngữ lúc mở Activity (FO: ngôn ngữ máy) → màn ngày
+    tháng ngay trong phiên đó (A049 Birth trong FO) có thể còn sai. Chưa kiểm trên máy; QC trên API khác 32–33.
+  - A048 tự chữa thêm: `MainActivity.getResources` gọi `LanguageManager.applyLocale` (comment: WebView của ad có thể
+    reset locale về máy), `onResume` gọi lại `updateLanguage`.
+- Ngôn ngữ máy đọc từ `Resources.getSystem().configuration.locales[0]` (A048 `LanguageManager.codes`).
+  `Locale.getDefault()` đã bị `Locale.setDefault` lúc áp ngôn ngữ (`updateLanguage`; A013, A049 cả
+  `wrapContextWithLocale`) đổi thành ngôn ngữ app.
+- Chữ xem trước theo ngôn ngữ đang chọn (chưa áp): `LanguageManager.getString(context, code, res)` dựng context mới mỗi
+  lần gọi → bọc `remember(code)`. A013 dùng cho tiêu đề màn; A048 cho tiêu đề và popup confirm.
+
 ---
 
 ## MO-32 — Bộ 55 mã ngôn ngữ
@@ -110,7 +145,13 @@ tay, popup, buffer.
   3. Resource: mã vùng dùng chung `values-ms`, `values-ur`. Giữ cả `values-in` lẫn `values-id` như A013.
      Thiếu bản dịch thì chạy skill `localize-android`.
   4. App không xtechads / XML: list chỉ là dữ liệu, áp y hệt.
+  - Ref A048 khác A013: chỉ 13 mã có bản dịch đủ (`en, es, pt, ar, nl, fr, de, hi, it, pl, ru, tr, vi`;
+    `LanguageManager.codes`) → chưa đạt nghiệm thu 54 dòng. App theo A048 thì hỏi PO trước khi mở rộng: bộ
+    mã và thứ tự mặc định của từng app theo doc PO của app đó, không phải luật chung.
 - **Bẫy:**
+  - App có `resourceConfigurations` (A048 khai đúng 13 mã trong `app/build.gradle.kts`): thêm mã vào list mà quên
+    khai ở đây thì AGP bỏ `values-<mã>` khỏi APK → chọn xong chữ vẫn tiếng Anh. Lên đủ 55 mã thì khai theo đúng tên
+    thư mục `values-*` đang có, hoặc bỏ filter (A013 không khai).
   - Thêm cả `in` lẫn `id` → 2 dòng "Indonesia".
   - Trên Android, `Locale.getLanguage()` trả mã cũ (`in`, `iw`, `ji`), còn `toLanguageTag()` trả mã mới
     (`id`, `he`, `yi`). So khớp mã máy phải xử lý cả hai (MO-33).
@@ -149,6 +190,16 @@ tay, popup, buffer.
   3. Mọi Activity có UI: `attachBaseContext` wrap theo `languageSelected` (rỗng = giữ máy).
   4. Chỉ ghi `languageSelected` ở bước xác nhận của Alt. a034 ghi ngay lúc tap ở màn normal → user thoát
      giữa chừng vẫn bị đổi ngôn ngữ; đừng làm theo.
+  - Ref A048 khác A013:
+    - `LanguageManager.codes` đọc ngôn ngữ máy từ `Resources.getSystem().configuration.locales[0]`, nên màn Setting của
+      user cũ vẫn ra đúng ngôn ngữ máy (hết bẫy `lazy` bên dưới). So khớp: tag → `language` → mã list có phần trước
+      `-` trùng `language` → `en`. List có `id` thì vẫn dính lệch `in`/`id` như A013.
+    - `wrapContextWithLocale` không gọi `Locale.setDefault`.
+    - `MainActivity.attachBaseContext` xoá `languageSelected` khi còn `firstOpen`: FO bỏ dở thì lần mở sau làm lại
+      Language theo ngôn ngữ máy.
+  - App đã làm: A049 đọc ngôn ngữ máy như A048, nhưng chỉ xoá `languageSelected` khi chưa qua Onboard
+    (`onboard_completed`, PO P4900, Q42). Màn Setting đưa ngôn ngữ đang dùng lên đầu theo PO
+    (`LanguageManager.withCurrentFirst`); FO vẫn ngôn ngữ máy đầu.
 - **Bẫy:**
   - `lazy` tính theo `Locale.getDefault()` của lần đọc đầu. `wrapContextWithLocale` gọi `Locale.setDefault`,
     nên ở màn Setting của user cũ, ngôn ngữ đang dùng lên đầu thay vì ngôn ngữ máy. Chấp nhận được, FO
@@ -156,6 +207,8 @@ tay, popup, buffer.
   - Dời ngôn ngữ máy bằng `language_oder` (DEV-6) là ngoại lệ có chủ ý; mặc định phải ở đầu list.
 - **QC:** đổi ngôn ngữ **của máy** trong Settings (không dùng per-app locale) sang vi, id, he, ur-PK và một
   ngôn ngữ ngoài list (vd sw) → `pm clear` → mở app → kiểm dòng đầu và chữ trong app.
+  - App kiểu A048: xác nhận ngôn ngữ ở Alt → kill app trước khi xong FO → mở lại: chữ theo ngôn ngữ máy, làm lại
+    Language (A049: chỉ khi chưa qua Onboard).
 
 ## MO-34 — Sắp xếp theo tên hiển thị
 
@@ -194,8 +247,9 @@ tay, popup, buffer.
   - `priority_languages` — String CSV, default `""`, vd `en,hi,pt,es,ar,fr`. Alias:
     - a044 cùng tên, default `en,pt-BR,hi,de`; a027 cùng tên, default 10 mã `ar,hi,en,uk,fr,bn,ru,pt,th,es`.
     - A045, a034: `language_config.priority_languages` (mảng JSON; token `system` = vị trí ngôn ngữ máy;
-      default A045 `system,en,pt,hi,de`).
+      default A045 `en,system,es,pt,hi`).
     - a037, a042: `language_config.order`.
+    - A048, A049: `language_config.order` (mảng JSON hoặc chuỗi CSV; default A048 `en,es,pt,ar`; A049 đặt theo doc PO).
     - a033: `top_languages` (String CSV, default `en,hi,pt,vi,bn,pl,in,es,uk,tw,fr`).
   - `enable_new_language_selection_ui` — Boolean, `false`: bật header mới (icon tick thay chữ Done) và cho
     phép dùng `language_oder`.
@@ -212,10 +266,19 @@ tay, popup, buffer.
      tên `MAX_PRIORITY_LANGUAGES` để `audit.py` nhận ra.
   3. Gọi ở composable list, tính 1 lần (`remember`), như `LanguageContent.orderedLanguages`.
   4. Chỉ hỗ trợ dời ngôn ngữ máy (`language_oder`) khi MO yêu cầu. Dời thì dời cả ngón tay (MO-36).
+  - Ref A048 khác A013: `LanguageManager.reorderByPriority` cắt **10** (`PRIORITY_LANGUAGE_LIMIT`) **trước** khi lọc →
+    mã không có trong list hoặc trùng ngôn ngữ máy vẫn chiếm suất. Default `order` không rỗng → RC thiếu hoặc JSON sai
+    vẫn có nhóm ưu tiên. App theo A048 giữ như ref, báo lệch nghiệm thu (Q38).
 - **Bẫy:** cắt 6 **sau** khi lọc mã hợp lệ. Mã RC không có trong list bị bỏ qua im lặng. List dùng chung
   cho màn Setting, nên user cũ cũng thấy thứ tự UA.
+  - Companion `LanguageManager` của A048/A049 khởi tạo `layoutDirection` bằng `TextUtils` (Android) → gọi
+    `reorderByPriority` trong unit test JVM là văng ngay lúc nạp class. Muốn test thì để hàm reorder ở object Kotlin
+    thuần riêng.
 - **QC:** RC `priority_languages=fr,de,ja,ko,it,es,pt,ar` → `pm clear` → mở app 2 lần → sau dòng máy đúng
   `fr,de,ja,ko,it,es`. Thêm mã trùng ngôn ngữ máy → không lặp.
+  - App gom JSON (A048): thêm lượt `order` = `[]` → list trơn như MO-33/34.
+  - Thử "RC rỗng" bằng giá trị rỗng, hoặc xoá parameter rồi `pm clear`. Chỉ xoá parameter trên Firebase thì không đủ:
+    SDK chỉ ghi key có trên remote, máy giữ giá trị lần fetch trước (xtechcore `RemoteConfigManager`).
 
 ## MO-35 — Tách 2 màn Language và Language Alt (2 ads)
 
@@ -252,9 +315,17 @@ tay, popup, buffer.
   - Không SDK (A028, a036, a041): 2 `NativeAdUnit` riêng (A028 `ads/AdsManager.kt` — `nativeLang`,
     `nativeLangAlt`), hiển thị bằng `NativeView` của app.
   - XML/Fragment: 2 destination Nav2 (`navigate` + `popUpTo`), hoặc 1 Fragment đổi state + 2 ad view.
+  - Ref A048: NavDisplay lồng (`ui/screen/language/LanguageNavigation.kt`, `ui/navigation/ChildNavDisplay.kt` tắt hết
+    transition) dùng chung `LanguageViewModel`. Sang Alt **không** pop Normal (`backStackChild.navigateTo` không có
+    `popupTos`).
 - **Bẫy:** không preload `language_alt` → Alt hiện shimmer. Animation chuyển màn làm lộ "màn mới" (A045 tắt
-  transition). 2 placement chung 1 nameSpace vẫn chạy (unit cache theo placement) nhưng MO không đo riêng
+  transition).
+  - Preload `language_alt` (và native popup) lúc dựng màn Normal (`LaunchedEffect(Unit)`) thay vì mỗi lần resume:
+    Splash điều hướng ở `onAdShow` nên request chạy dưới inter splash, ghi `screen_name=ScrSplash` (A049 trước 16/10,
+    MO báo sai). A013 nạp trong `LifecycleResumeEffect` (MO-31). 2 placement chung 1 nameSpace vẫn chạy (unit cache theo placement) nhưng MO không đo riêng
   được.
+  - Kiểu A048: Normal còn nằm dưới Alt trong back stack con, chỉ `BackHandler` của Alt chặn back về Normal
+    (`NavDisplay.onBack` sẽ pop). Handler đó phải luôn bật.
 - **QC:** logcat `iaa_`: màn 1 có impression `language`; tap → impression `language_alt` gần như tức thì.
   Back ở Alt không về màn 1.
 
@@ -285,7 +356,10 @@ tay, popup, buffer.
   từ A045, A045 default `5`). Alias:
   - a034 `delay_show_tooltips` (ms, `2000`) + `language_config.finger_position` (1-based, `2`).
   - a014 `time_show_tooltips_language` (giây, `4`, cộng dồn qua các lần resume).
-  - A045 `language_config.finger_position`. a044 cứng 3 giây. a016 hiện ngay, không chờ.
+  - A045 `language_config.hint_delay_second` (giây, `5`; v1.0.9 đã bỏ `finger_position`). a044 cứng 3 giây. a016 hiện
+    ngay, không chờ.
+  - A048 không có RC delay (cứng 3 giây). `language_config.finger_position` (A048 default `1`, a037 `4`) chỉ chọn dòng
+    ngón tay chỉ; ngôn ngữ máy vẫn ở dòng 1 (khác `language_oder`).
 - **Placement / tracking:** không có event riêng.
 - **Cách làm:**
   1. State `showFingerHint` của màn Language normal: bật sau delay RC tính từ lúc resume; tắt khi chọn.
@@ -295,12 +369,29 @@ tay, popup, buffer.
   4. Back: chặn bằng `BackHandler` + `PredictiveBackHandler` (A013 `GeneralBackHandler`).
   5. Asset: `img_click` (ảnh) hoặc Lottie (A045 `anim_finger_click`, a016 `ic_finger_touch`).
   - XML: `lifecycleScope` + `repeatOnLifecycle(STARTED)` + `delay`; animation bằng `ObjectAnimator`.
+  - Ref A048 khác A013:
+    - Delay 3 giây (`LanguageViewModel.HINT_DELAY_MS`) đếm từ lúc tạo ViewModel, không đếm lại khi resume. Click native
+      không bật ngón tay ngay.
+    - Ngón tay vẽ đè lên list (`LanguageContent`: `AppLottie` + `graphicsLayer.translationY` = chỉ số dòng × (chiều
+      cao dòng + khoảng cách) − đoạn đã cuộn).
+    - Thêm ngón tay thứ 2 chỉ nút tick, 2 giây sau khi chọn (`TICK_HINT_DELAY_MS`; bật 1 lần, khi sang Alt hoặc khi
+      back).
+    - Back ở Normal ẩn ngón tay dòng và mở popup (MO-86).
 - **Bẫy:**
   - Cờ hint đặt ở `AdsManager` (global, kiểu A013) thì phải reset trong `resetState`.
   - Ngón tay không được đè lên native hoặc nút CTA (policy).
   - Delay chạy bằng `rememberCoroutineScope` không bị huỷ khi pause (vô hại vì chỉ bật cờ).
+  - Ngón tay vẽ đè (kiểu A048) tính vị trí từ chiều cao dòng, khoảng cách và padding đầu list đang cứng. Đổi UI list
+    mà quên sửa phép tính → ngón tay lệch dòng.
+  - A048 không kẹp `finger_position`: `0` hoặc lớn hơn số dòng thì ngón tay rơi ra ngoài các dòng (bị cắt, hoặc chỉ
+    vào chỗ trống cuối list). A049 kẹp 1..số dòng.
+  - Kotlin chạy khởi tạo thuộc tính và khối `init` theo thứ tự dòng. A048 `LanguageViewModel` khai `firstHintJob`
+    (`= null`) **sau** `init` → job launch trong `init` bị ghi đè, `cancelFirstItemHint` không huỷ được: back trong
+    3 giây đầu ở Normal thì ngón tay dòng vẫn bật sau đó. Khai biến job trước `init`.
 - **QC:** mở FO, không chạm, bấm giờ → ngón tay đúng dòng máy sau N giây. RC = 5 → 5 giây. Back 3 lần →
   không thoát. App có `enable_new_language_selection_ui` thì thử `language_oder` = 0 và 3.
+  - Kiểu A048: không chạm → 3 giây có ngón tay ở dòng `finger_position`; chọn 1 dòng → sang Alt, 2 giây sau ngón tay
+    chỉ nút tick. Thử `finger_position` = 0, 3 và lớn hơn số dòng.
 
 ## MO-86 — Back ở màn Language
 
@@ -329,17 +420,38 @@ tay, popup, buffer.
     `language_config.confirm_popup_opt2_content` (default `cancel`).
 - **Placement / tracking:** popup dùng `popup_lang` (MO-94). `button_click` `BtnBack`, `BtnSave`;
   `overlay_show` `OvlConfirmLanguage`.
+  - A048/A049 log back là `BtnDeviceBack` (A048 `BackHandler` + `trackingButtonClickEvent`, A049 `GeneralBackHandler`).
 - **Cách làm:**
   1. Alt: state `showSaveHint`; back → bật; UI gồm nút Save + Lottie. Đọc `LanguageAltScreen` và
      `LanguageContent` / `SaveHintButton` ở A013 (bản hiện tại).
   2. Normal: back → popup xác nhận ngôn ngữ máy (dùng lại `ConfirmLanguageDialog`), preload native popup
      trước khi mở. Confirm = đúng hành vi tap dòng ngôn ngữ máy.
   3. Chặn cả back thường lẫn predictive (`GeneralBackHandler`). XML: `onBackPressedDispatcher.addCallback`.
+  - Ref A048 khác A013:
+    - Back ở **cả hai** màn mở `ConfirmLanguageDialog` có native `native_popup_lang`; Alt không có nút Save to.
+    - Normal chưa chọn → chọn sẵn dòng đầu (ngôn ngữ máy) rồi hỏi. Confirm → áp luôn và đi `language_next`, **không**
+      qua Alt (`LanguageViewModel.onConfirm` → `applyAndGoNext`).
+    - Cancel ở Normal: dòng đầu vẫn được chọn, tick bật, ngón tay chỉ tick (hẹn 2 giây từ lúc back) → user đi tiếp
+      được ngay từ Normal.
+    - a037: back ở cả 2 màn cũng mở popup (`ConfirmLangDialog`, placement `native_pop_up`); Confirm ở Normal áp dòng
+      đầu rồi đi thẳng (`LanguageScreen` — `handleConfirm`); Cancel chỉ đóng popup, list không chọn sẵn dòng nào.
+  - App đã làm: A049 (15/10/2026, ticket P5013, ref a044):
+    - Back ở Normal → `ConfirmDeviceLanguageDialog` (`OvlConfirmDeviceLanguage`, "Start in this language?", native
+      `confirm_device_language` cuối popup, cùng namespace `popup_confirm` với popup ở Alt).
+    - "Use device language" chọn ngôn ngữ máy rồi sang Alt, đúng yêu cầu "Confirm sang Alt".
+    - Nút thứ 2 theo `language_config.confirm_popup_opt2_content`: `cancel` (mặc định) đóng popup; `gotohome` nạp
+      `inter_ob` lúc bấm (ticket ghi rõ, khác a044 nạp sẵn khi vào màn; `InterObEffect` như A047) rồi vào Home, bỏ
+      các bước FO còn lại. Ticket ghi key phẳng, A049 để trong nhóm theo luật repo.
+    - Back ở Alt giữ `OvlConfirmLanguage` như A048.
 - **Bẫy:**
   - A013 bật `BackHandler` cho API ≤ 33 và `PredictiveBackHandler` cho API ≥ 34 → test cả hai.
   - Popup đang mở mà back → đóng popup, không mở popup chồng.
   - Nút Save màu chính nằm sát native → kiểm thêm DEV-9 (màu CTA).
+  - Kiểu A048 bỏ qua Alt khi Confirm (hoặc bấm tick) ở Normal → mất impression `language_alt`, lệch yêu cầu "Confirm
+    sang Alt". App theo A048 vẫn làm như ref, ghi lệch vào bảng khác biệt và hỏi user (Q37).
 - **QC:** Android 13 bấm phím back, Android 14 vuốt cạnh, ở cả 2 màn.
+  - A048/A049 chỉ dùng `BackHandler` (không `PredictiveBackHandler`): vẫn phải thử vuốt cạnh Android 14+.
+  - Kiểu A048: back ở Normal → popup với dòng đầu; Confirm → sang thẳng màn kế; Cancel → ở lại, tick bật.
 
 ### Cơ chế chung: hành động sau khi click native (MO-37 / MO-38 / MO-39)
 
@@ -535,6 +647,7 @@ không reload/disable chồng lên. App đang theo kiểu SDK (A045, a034, a037:
   - Alias: cùng tên ở a027, a033, a042. a037 `language_config.buffer_alt` (default `true`) +
     `language_config.min_ad_interval_alt` (`1000`). Màn Select dùng `buffer_select_alt` /
     `min_ad_interval_select_alt` (select.md § MO-43).
+  - A048 cùng tên key phẳng, default buffer `true` (A013 `false`). A049 gom vào `language_config` như a037.
 - **Placement / tracking:** `language_alt` (2 unit cùng placement → log cùng tên placement).
 - **Cách làm:**
   1. Tạo unit buffer: cùng placement, `nameSpace` override = tên nameSpace của placement.
@@ -543,14 +656,33 @@ không reload/disable chồng lên. App đang theo kiểu SDK (A045, a034, a037:
   3. Gắn `onClicked` cho cả unit buffer (MO-37..39).
   4. Reset cả 2 unit khi rời luồng (A013 `resetNativeLangAlt`, gọi từ `resetAdsBeforeSelect`).
   - Không SDK: 2 instance `NativeAdUnit` cùng id; view bind theo cờ đang hiện unit nào.
+  - Ref A048 khác A013:
+    - Logic viết thẳng trong `alternative/LanguageAltScreen` (không có class `BufferedNative`). Đổi ad khi
+      `selectedCode` đổi (`snapshotFlow`, bỏ giá trị lúc vào màn).
+    - Unit đệm `AdsManager.nativeLanguageAltBuffer` = `AdGroupUnit.of` placement `language_alt` + nameSpace
+      `"language_alt"`. Tên trùng nameSpace trong config nhưng khoá cache khác (`language_alt:language_alt` ≠
+      `language_alt:`) → instance riêng, cùng waterfall. `NativeBannerGroupView` lấy unit theo (placement, nameSpace)
+      → màn chỉ đổi `nameSpace` truyền xuống là view đổi ad.
+    - Màn Normal nạp sẵn cả unit đệm và native popup → lần đổi đầu ở Alt có ad ngay, đổi lại nhiều request sớm hơn.
+      A049 bỏ cách này 16/10 (user thấy Language request `native_lang_alt_high` 2 lần): Normal chỉ nạp unit chính, Alt
+      nạp unit đệm khi RESUMED như A013. Hook `onImpression` gắn trong `LifecycleResumeEffect`: ad nạp sẵn có
+      impression trước `screen_show` của Alt, hook gắn lúc dựng màn sẽ request unit đệm dưới tên màn trước.
 - **Bẫy:**
   - `AdGroupUnit.loadAd()` bỏ qua khi status là SUCCESS (chưa hết hạn), LOADING hoặc TIMEOUT. Vì vậy chế độ
     không buffer chỉ đổi được ad sau khi ad đang hiện đã impression. Muốn ép thì `reset()` trước `loadAd()`
     (fix night-dev a033), đổi lại view trống trong lúc load.
   - Buffer làm gấp đôi request → MO cân fill rate / show rate.
   - `rememberBufferedNative` đọc cờ buffer 1 lần lúc vào màn.
+  - A048 (A049 cũng vậy) cứng nameSpace đệm = `"language_alt"`. MO trỏ placement `language_alt` sang nameSpace khác
+    trên RC thì unit đệm vẫn chạy nameSpace cũ; nameSpace cũ bị xoá thì unit đệm tắt, không bao giờ swap. A013
+    `bufferUnit()` lấy `nameSpaceName` của unit chính nên không dính.
+  - A048 `LanguageViewModel.onCleared` không reset unit đệm (chỉ reset trong `AdsManager.resetSplashAds`, gọi ở
+    `MainActivity.onCreate`). A049 reset cả 2 unit trong `onCleared`.
 - **QC:** bật buffer → chạm đổi ngôn ngữ → logcat `iaa_request` / `iaa_impression placement=language_alt` có
   `ad_request_id` khác nhau. Chạm 5 lần trong 1 giây → chỉ đổi 1 lần.
+  - Hai unit log y hệt: logcat SDK cùng `loadAd: placement=language_alt, nameSpace=language_alt`; `iaa_*` cùng
+    `ad_unit_name`. Kiểm bằng `ad_request_id` / impression mới sau mỗi lần đổi, đừng nhìn hình ad: creative test của
+    Google hay trùng nhau.
 
 ## MO-94 — Chạm lại ngôn ngữ đã chọn ở Alt → popup confirm có native
 
@@ -573,10 +705,11 @@ không reload/disable chồng lên. App đang theo kiểu SDK (A045, a034, a037:
     `LanguageContent`); A045, a037 hỏi khi chạm lại bất kỳ dòng đã từng chạm (`tappedCodes`, `visitedCodes`)
     như A013. Cả hai đều đạt sheet; A013 bao trùm hơn.
 - **Remote config:** A013 không có (luôn bật). Alias: `confirm_language` (Boolean, `true`; a014, a027, a034,
-  a042, a047); A045 `confirm_same_language_alt` (`true`); a039 `time_show_show_confirm_lang`.
+  a042, a047); A045 `language_config.confirm` (`true`; trước v1.0.9 là `confirm_same_language_alt`); a039
+  `time_show_show_confirm_lang`.
 - **Placement / tracking:**
-  - `popup_lang` (A013). Alias: `confirm_language` (a014, a027, a033, a034), `native_popup_lang` (a016),
-    `native_popup_confirm` (a044), `native_pop_up` (a037). A045 dùng placement `language_alt` với nameSpace
+  - `popup_lang` (A013). Alias: `confirm_language` (a014, a027, a033, a034), `native_popup_lang` (a016, A048,
+    A049), `native_popup_confirm` (a044), `native_pop_up` (a037). A045 dùng placement `language_alt` với nameSpace
     override (unit thứ 2).
   - `overlay_show` `OvlConfirmLanguage`; `button_click` theo nút, kèm `overlay_name`.
 - **Cách làm:**
@@ -586,10 +719,23 @@ không reload/disable chồng lên. App đang theo kiểu SDK (A045, a034, a037:
   4. Click native trong popup → quay lại thì tự Confirm: a037 `ui/screen/language/LanguageAltScreen.kt` dùng
      `NativeAdClickAction` cho `nativePopup`.
   5. (Tuỳ chọn) RC `confirm_language` để MO tắt popup.
+  - Ref A048 khác A013:
+    - `LanguageViewModel.tappedCodes`: mã tap ở Normal được thêm trước khi sang Alt; chạm lại bất kỳ mã đã chạm →
+      popup (như A013).
+    - Native popup: nameSpace `native_popup_lang` (`actionClicked: none`, `reloadWhenResume: false`, layout
+      `native_med_4_3_media_left` trong `app/config/ads_config.json`), nạp sẵn ở màn Normal cùng `language_alt` → mở
+      là có ad.
+    - Chữ trong popup theo ngôn ngữ đang chọn (`LanguageManager.getString(context, code, res)`), chưa theo locale app.
+      A013 dùng `stringResource` (ngôn ngữ app).
+    - Cùng popup cho back (MO-86).
 - **Bẫy:** A013 chỉ load native popup lúc mở → popup hiện shimmer. Popup đang mở mà ad Alt bị click với
   `next_screen` → đóng popup trước khi navigate. Popup không dùng chung unit với native Alt đang hiện (2 view
   cùng 1 ad).
+  - Kiểu A048 đổi ad Alt mỗi khi `selectedCode` đổi (MO-98) → chạm lại mã cũ khác dòng đang chọn thì vừa mở popup vừa
+    đổi ad Alt sau lưng popup. A013 chỉ đổi ad khi chạm mã mới.
 - **QC:** đi đúng chuỗi nghiệm thu; logcat `iaa_impression placement=popup_lang`.
+  - App theo A048: logcat SDK `loadAd: placement=native_popup_lang` phải chạy ở màn Normal (nạp sẵn), không đợi lúc mở
+    popup.
 
 ## MO-42 — Remote config màn kế sau Language
 
@@ -617,7 +763,10 @@ không reload/disable chồng lên. App đang theo kiểu SDK (A045, a034, a037:
   3. Dùng cùng `nextLanguage` cho preload (`preloadAdsFO`) và navigate.
   4. App có paywall trong FO thì thêm giá trị `iap`.
   5. Chặn self-loop: đích trùng màn hiện tại → fallback (a016 `AdsManager.getNextDestination`).
-- **Bẫy:** sai kiểu tên (camelCase vs snake_case) → về default, không báo lỗi. A013 `new_onboard = true` làm
+- **Bẫy:** sai kiểu tên (camelCase vs snake_case) → về default, không báo lỗi. Alt preload ad màn kế lúc dựng màn
+  (A013 `LaunchedEffect(Unit)`) thì request ghi `ScrLanguage`, vì Alt chỉ `screen_show` khi RESUMED; A049 (16/10, MO
+  yêu cầu "load ở LanguageAlt") đặt trong `LifecycleResumeEffect`. Màn kế là Onboard: MO A049 yêu cầu `onboard_1` +
+  `fs_onboard` (khi bật). A013 `new_onboard = true` làm
   Onboard luôn đi `ScrOnboardFeature` (bỏ qua `onboard_next`). Xem thêm `xTechSDK/docs_final/FO_ADS_FLOW.md`.
 - **QC:** set lần lượt `language_next` = `onboard` / `select` / `home` / `iap` → hoàn tất Alt → đúng màn, ad
   màn đó có ngay.

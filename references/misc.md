@@ -29,7 +29,7 @@
   - Tổng số lần hiện bị giới hạn bởi RC.
   - Không hiện đè lên ad.
 - **SDK**:
-  - `xtechads/.../domain/preference/AdsSharedPref.kt` có `rated` và `star_review_to_store` (mặc định 4): số sao từ ngưỡng này trở lên thì đưa user lên Play.
+  - `xtechads/.../domain/preference/AdsSharedPref.kt` có `rated` và `star_review_to_store` (mặc định 4): số sao từ ngưỡng này trở lên thì đưa user lên Play. SDK chỉ **khai** key này, không tự đọc (trong lib `xtechads`, ngoài `AdsSharedPref` không có chỗ nào gọi getter): app phải tự làm "sao ≥ ngưỡng → Store" (A013 `utils/RatingUtil.kt`).
   - SDK không có gate hay popup rating.
 - **Chuẩn của mục này = A045 `domain/rating/RatingGate.kt`** (đọc bản hiện tại, kèm `docs/features/rate-success.md`).
   A013 lệch spec; A014 đã bỏ RC đếm. Cả hai ghi ở phần "Biến thể" bên dưới.
@@ -70,7 +70,7 @@
   - `rate_success_jump` (Long, `1`): số lượt thành công phải thêm giữa 2 lần hiện.
   - `rating_max_show` (Long, A045 `3`, A014 `2`): trần tổng số lần hiện. A47 khai Int nên RC không có tác dụng.
   - Key cũ cùng ý nghĩa bật/tắt: `show_rating_at_success` / `show_rating_at_compress` (A013), `show_rating` (a037, a039).
-  - `star_review_to_store` (Long, `4`, SDK): số sao từ ngưỡng này trở lên thì đưa user lên Play.
+  - `star_review_to_store` (Long, `4`, khai ở SDK nhưng app tự đọc và tự áp): số sao từ ngưỡng này trở lên thì đưa user lên Play.
 - **Placement / tracking**:
   - `rate_app` (param `rate_value`).
   - `rating_dialog_show` (A014).
@@ -301,14 +301,28 @@
      - Start Activity chính với `NEW_TASK` (Activity singleTask), hoặc `REORDER_TO_FRONT`.
      - Màn gọi nhận kết quả lúc resume rồi chạy tiếp tính năng.
   4. **App XML**: helper giống hệt, gọi từ Activity / Fragment.
+  - **Ref A048 khác A013**:
+    - A048 `common/utils/SettingsReturn.kt` `checkSettingOn`: poll 200ms sau 1s, timeout 60s. Kéo về bằng `REORDER_TO_FRONT | NEW_TASK` kèm extra `EXTRA_BRING_TO_FRONT`; `MainActivity.onNewIntent` thấy extra này thì bỏ qua (không `initArgs`, không log `app_open_from`).
+      - Không dừng khi user tự quay về: chỉ dừng khi đã kéo về hoặc hết timeout. Lệch nghiệm thu "không bị nhảy về app lúc user đã rời Settings đi chỗ khác": theo ref A048 thì ghi vào bảng khác biệt và hỏi user.
+      - Settings mở qua `ui/properties/AppSettingsLauncher.kt` `rememberSettingsLauncher` (launcher `StartActivityForResult`, nên Settings nằm cùng task).
+      - Chỉ Wi-Fi bật kéo về (`MainNavigation`, `grantedCheck` = đã có mạng). Camera / mic chỉ kiểm lại lúc user tự quay về (`onReturn`).
+    - App đã làm: A049 (10/2026) bản rút gọn của A013 `PermissionSettingsGuide` (`common/utils/PermissionSettingsGuide.kt`: 1 intent, không tip, không `SettingsResult`). Dùng cho:
+      - quyền camera đã bị từ chối hẳn (`SelectHandScreen`, `isGranted` = có quyền camera);
+      - nút Open Settings của `OvlNoInternet` (`MainActivity.openInternetSettings`: trang Wi-Fi, `isGranted` = `isOnlineNow`). A013 `openInternetSettings` cùng cơ chế nhưng kiểm `isConnected` (VPN mất Wi-Fi vẫn true, xem Q34).
 - **Bẫy**:
   - **Giới hạn mở Activity từ nền (Android 10+)**: kéo app về chỉ chắc chắn được khi Settings được mở từ Activity của app và nằm cùng task (ghi chú trong `PermissionSettingsGuide` A013). Mở Settings với `NEW_TASK` thì tip bị chặn. Phải test trên Android mới.
   - **Android 14+** đóng băng app khoảng 10s sau khi cửa sổ cuối biến mất, nên việc polling bị treo (ghi chú trong A013). Lúc đó chỉ còn cách user tự quay về và màn kiểm tra lại lúc resume.
   - Không dừng theo dõi khi user đã về tay: lần bật quyền sau đó sẽ kéo app lên bất ngờ.
   - Quyền có dialog hệ thống (camera, POST_NOTIFICATIONS lần đầu) không cần cơ chế này.
+    - Nhưng quyền runtime đã bị từ chối hẳn thì dialog không hiện nữa, chỉ còn đường App info: lúc đó cần cơ chế này, `isGranted` = kiểm quyền runtime. Màn gọi vẫn kiểm lại lúc resume (A049 `SelectHandScreen` + `SelectHandViewModel.onResume`).
+  - Đừng dùng lại helper App info của màn Uninstall (có `NEW_TASK`, vd A048 / A049 `openAppSetting`): Settings nằm task riêng, không kéo app về được. A049 tách `appSettingsIntent()` (không cờ) cho `PermissionSettingsGuide`.
+  - Intent kéo app về đi vào `onNewIntent` của Activity `singleTask`. Nếu `onNewIntent` coi đó là lượt mở mới (log `app_open_from`, restart task về Splash, MO-78) thì intent kéo về không được mang `KEY_OPEN_FROM` (A013, A049), hoặc phải mang dấu riêng để bỏ qua (A048 `EXTRA_BRING_TO_FRONT`).
+  - Sang Settings thì Activity `onPause` / `onStop`, đúng chỗ app bắn noti kill-app (MO-69, MO-88). Phải bật cờ "đang mở màn ngoài" trước khi mở để không bắn noti: A013 `AppScreenState.openSetting`, A049 `ExternalScreen.opening` (cả hai hạ ở `MainActivity.onResume`). A048 dựa vào `disableAdResumeOneTime` đã bật trước khi mở.
 - **QC**:
   - Android 10, 13, 14, 15. Pixel và Xiaomi / Samsung.
   - Bật ngay. Bật sau 30s. Rời Settings sang app khác rồi mới bật. Không bật mà bấm back.
+  - Quyền runtime bị từ chối hẳn (A049: camera): popup → Open Settings → App info → bật → app tự lên và vào tiếp tính năng.
+  - Sau khi app được kéo về: không quay lại Splash, không có `app_open_from` mới.
 
 ## DEV-19 — Force update: ép user cập nhật lên bản mới nhất
 

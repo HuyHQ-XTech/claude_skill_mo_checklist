@@ -3,7 +3,7 @@
   "source": "Checklist MO tactic.xlsx",
   "master_sheet": "Checklist - MO New",
   "snapshot": "2026-10-07",
-  "id_rule": "MO-<số dòng trong sheet 'Checklist - MO New'>; DEV-<dòng> = sheet 'Checklist - Dev - không xoá'; CC-<dòng> = sheet 'Crawl Competitor'",
+  "id_rule": "MO-<số dòng trong sheet 'Checklist - MO New'>; DEV-<dòng> = sheet 'Checklist - Dev - không xoá'; CC-<dòng> = sheet 'Crawl Competitor'; EXT-<TÊN> = tactic MO đã làm theo ticket nhưng chưa có dòng trong sheet (sheet = '', row = 0, không có MO-ID)",
   "default_ref": "a013",
   "sheet_status_apps": [
    "a013",
@@ -977,7 +977,7 @@
    ],
    "sdk": {
     "available": true,
-    "api": "AdUnit.canLoadAd = canShowAds && isConnected; canShowAds = umpAllowed && !isPurchase; BaseAds.consentFinished; AdGroupUnit.loadAd trước consent → FAIL ngay",
+    "api": "AdUnit.canLoadAd = canShowAds && isConnected; canShowAds = umpAllowed && !isPurchase; BaseAds.consentFinished; AdGroupUnit.loadAd trước consent → FAIL ngay khi offline hoặc UMP đã biết cần consent; lúc UMP chưa trả trạng thái thì umpAllowed = true và request vẫn đi (BaseAds.umpAllowed)",
     "min_version": null,
     "note": ""
    },
@@ -1783,7 +1783,7 @@
     "Firebase console gửi test message tới token (log fcm_token).",
     "Đổi 1 key RC → lần mở sau thấy giá trị mới."
    ],
-   "notes": "Push/FCM chi tiết ở MO-75 (nhóm noti)."
+   "notes": "Push/FCM chi tiết ở MO-75 (nhóm noti). Tắt plugin google-services → crash Default FirebaseApp is not initialized ở SDK logScreenShow; giữ file placeholder (A049 app/google-services.json)."
   },
   {
    "id": "MO-17",
@@ -2035,7 +2035,7 @@
     "Mở 1 placement → đủ iaa_*.",
     "Mở paywall → mua / huỷ / restore → đủ iap_*."
    ],
-   "notes": "Sheet: chưa app nào đạt → cần MO chốt danh sách event/param trước khi audit. App không IAP: phần IAP N/A (detect.all sẽ thiếu iap_purchase_x)."
+   "notes": "Sheet: chưa app nào đạt → cần MO chốt danh sách event/param trước khi audit. App không IAP: phần IAP N/A (detect.all sẽ thiếu iap_purchase_x). sessionNumber chỉ tăng khi mở mới (savedInstanceState == null: A013, A047, A049; A048 tăng ở mọi onCreate). Event từ process dậy nền mang session_number 0 nếu không gán lại (A049 LockScreenActivity, NotificationManager)."
   },
   {
    "id": "MO-19",
@@ -2512,9 +2512,10 @@
    "qc": [
     "Debug EEA: Consent → Firebase consent granted.",
     "Clear data → Manage options → tắt hết → Confirm → app vẫn chạy, tracking_consent status=rejected, consent DENIED.",
-    "Logcat thứ tự requestUMP → initMobileAds → loadAd."
+    "Logcat thứ tự requestUMP → initMobileAds → loadAd.",
+    "So mốc logcat loadAd: placement=splash với sdk_init mobile_ads_finish"
    ],
-   "notes": "Cần MO chốt: (1) có chờ mobileAdsFinish trước khi load splash (Google khuyến nghị khi dùng mediation; A013 load song song để nhanh; ANR a037 P1624); (2) mapping TCF → consent mode và default manifest (cần MO/legal); (3) Facebook App Events có gate theo consent không."
+   "notes": "Cần MO chốt: (1) có chờ mobileAdsFinish trước khi load splash (Google khuyến nghị khi dùng mediation; A013 load song song để nhanh; ANR a037 P1624); (2) mapping TCF → consent mode và default manifest (cần MO/legal); (3) Facebook App Events có gate theo consent không. Mẫu mapping đã làm: A049 ads/ConsentMode.kt + test ConsentModeTest, nghe IABTCF_* suốt phiên (MainActivity.syncFirebaseConsent). SDK start AppsFlyer trước UMP, không enableTCFDataCollection."
   },
   {
    "id": "MO-23",
@@ -2860,6 +2861,13 @@
         "a014"
        ],
        "note": "Boolean, mặc định true"
+      },
+      {
+       "key": "noti_config:permission_trigger",
+       "apps": [
+        "a049"
+       ],
+       "note": "splash | home, default splash"
       }
      ]
     }
@@ -2893,7 +2901,7 @@
     "Mở lại app → không hỏi.",
     "RC noti_permission_trigger=home → splash không hỏi."
    ],
-   "notes": "Cờ tương đương: notiAnswered (a045), notiFinished (a027), notiPermFinished (a039), requestingNotificationPermission (a033), notiResolved (a014). Show inter phải chờ hasWindowFocus. Audit có thể báo dương tính giả khi chỉ khớp khai báo cờ (vd a036 `passedNotificationSplash` khai mà không set) → đọc Splash để xác nhận luồng xin quyền thật."
+   "notes": "Cờ tương đương: notiAnswered (a045, a047, a049), notiFinished (a027), notiPermFinished (a039), requestingNotificationPermission (a033), notiResolved (a014), passedNotification (a048). Show inter phải chờ hasWindowFocus. Audit có thể báo dương tính giả khi chỉ khớp khai báo cờ (vd a036 `passedNotificationSplash` khai mà không set) → đọc Splash để xác nhận luồng xin quyền thật. A047/A048/A049 hỏi ở mọi lần mở (không cờ 1 lần) → form UMP hiện lại có thể đè popup (open-questions Q33)."
   },
   {
    "id": "MO-26",
@@ -2996,7 +3004,7 @@
     {
      "name": "button_click",
      "params": "button_name=BtnEnableInternet",
-     "note": ""
+     "note": "a047 BtnNoInternetOpenSettings, a048/a049 BtnOpenSettings"
     },
     {
      "name": "enable_internet_wifi",
@@ -3031,9 +3039,10 @@
    "qc": [
     "Bật máy bay ở splash → popup (ảnh assets/refs/MO-26-1.jpg).",
     "Bấm nút → bật Wi-Fi → popup tắt, splash load ad.",
-    "Hotspot không có 4G → vẫn coi là offline."
+    "Hotspot không có 4G → vẫn coi là offline.",
+    "Máy bật VPN: bật máy bay → ghi lại popup có hiện không (app theo isConnected của SDK như A013/A047/A048 sẽ không hiện, A049 hiện); chưa coi là lỗi khi Q34 chưa chốt"
    ],
-   "notes": "Tên tương đương: NoInternetDialog (a045, a047, a037, a039, a044, a031, a041 core/ui), NoInternetPopup (a033, a027, a028), NoInternetGate (a047), NetworkSettingsHelper (a041). Liên quan MO-88 (noti khi sang Settings), MO-90 (auto về app)."
+   "notes": "Tên tương đương: NoInternetDialog (a045, a047, a037, a039, a044, a031, a041 core/ui), NoInternetPopup (a033, a027, a028), NoInternetGate (a047), NetworkSettingsHelper (a041). Liên quan MO-88 (noti khi sang Settings), MO-90 (auto về app). Popup: A048/A049 ui/dialog/NoInternetDialog.kt. Tự kéo app về sau khi bật mạng: A047 common/utils/NetworkEffects.kt rememberWifiSettingsOpener, A048 common/utils/SettingsReturn.kt checkSettingOn. A049 dùng NetworkStatus.onlineFlow (bắt được VPN); nút mở Wi-Fi qua PermissionSettingsGuide như A013 openInternetSettings (chỉ ACTION_WIFI_SETTINGS, không thử Internet panel), kiểm isOnlineNow, tự kéo app về (trước 15/10/2026 dùng SDK openWifiSetting, không kéo về)."
   },
   {
    "id": "MO-27",
@@ -3264,7 +3273,7 @@
     "Kill giữa FO → mở lại → splash → FO tiếp.",
     "Đang ở Home mở app từ noti → splash chạy lại."
    ],
-   "notes": "Sheet gợi ý thêm back từ Onboard1 về Language Alt — xem MO-52. Nav3 rememberNavBackStack saveable: recreate() bỏ qua splash, A013 khởi động lại task."
+   "notes": "Sheet gợi ý thêm back từ Onboard1 về Language Alt — xem MO-52. Nav3 rememberNavBackStack saveable: recreate() bỏ qua splash, A013 khởi động lại task. Back ở Splash vẫn log BtnDeviceBack (A047 DeviceBackHandler, A048 SplashScreen, A049 GeneralBackHandler). Dựng lại stack sau click ads phải bỏ ScrSplash (A047/A049 SplashViewModel.restoreClickAdsStack)."
   },
   {
    "id": "MO-29",
@@ -3583,7 +3592,7 @@
     "FO + bật native_full_splash trong RC → native full đếm 5s.",
     "Click inter → quay lại → đúng logic_pass_splash (reload: thấy inter thứ 2)."
    ],
-   "notes": "Liên quan MO-93 (từ ads trở về auto next). showFullScreen thiếu onAdClosed/onAdFailedToShow → nuốt điều hướng. Unit splash IMPRESSED từ lần mở trước phải reset ở MainActivity.onCreate."
+   "notes": "Liên quan MO-93 (từ ads trở về auto next). showFullScreen thiếu onAdClosed/onAdFailedToShow → nuốt điều hướng. Unit splash IMPRESSED từ lần mở trước phải reset ở MainActivity.onCreate. A047/A048/A049 coi TIMEOUT là đi tiếp; timeout nameSpace splash 30000 (a047, a049), 12000 (a048). Reset TrackingState.lastScreen ở MainActivity.onCreate khi mở mới, không thì app-open đè Splash. Base project có trần splash_timeout_seconds: giữ thì chỉ đếm sau consent và khi có mạng; A049 đã bỏ hẳn trần (15/10/2026)."
   },
   {
    "id": "MO-30",
@@ -4033,7 +4042,13 @@
     "ngôn ngữ hỗ trợ",
     "ngon ngu ho tro",
     "ms-bn",
-    "ur-pk"
+    "ur-pk",
+    "rtl",
+    "right to left",
+    "arabic",
+    "tiếng ả rập",
+    "tieng a rap",
+    "ả rập"
    ],
    "requirement": "Màn chọn ngôn ngữ có đủ 55 mã của sheet. `in` và `id` cùng là tiếng Indonesia nên chỉ hiện 1 dòng (54 dòng); mã có vùng (ms-BN/MY/SG/ID, ur-IN/PK) là dòng riêng.",
    "acceptance": [
@@ -4087,7 +4102,7 @@
     "Chọn ms-BN, ur-PK, my, id → UI đổi ngôn ngữ, không văng",
     "Máy tiếng Ả Rập → layout RTL"
    ],
-   "notes": "55 mã sheet: en,fr,in,pt,es,hi,it,ms,ja,ko,de,ar,fa,ru,zh,tr,cs,nl,vi,hu,ro,pl,bg,el,sk,da,iw,hr,sl,sv,ca,uk,th,no,fi,ms-BN,ms-MY,ms-SG,ms-ID,ur-IN,ur-PK,bn,km,my,az,uz,gu,ta,te,mr,kn,or,ml,sq,id. detect.all dò các mã hay thiếu khi đứng làm phần tử list (có dấu phẩy) — vẫn là heuristic (A013 có code chết gridLanguages chứa vài mã vùng), phải đếm list thật. Sheet: a016 thiếu id (có in) và thừa pa/as/mai; a018 thiếu 1-2 mã."
+   "notes": "55 mã sheet: en,fr,in,pt,es,hi,it,ms,ja,ko,de,ar,fa,ru,zh,tr,cs,nl,vi,hu,ro,pl,bg,el,sk,da,iw,hr,sl,sv,ca,uk,th,no,fi,ms-BN,ms-MY,ms-SG,ms-ID,ur-IN,ur-PK,bn,km,my,az,uz,gu,ta,te,mr,kn,or,ml,sq,id. detect.all dò các mã hay thiếu khi đứng làm phần tử list (có dấu phẩy) — vẫn là heuristic (A013 có code chết gridLanguages chứa vài mã vùng), phải đếm list thật. Sheet: a016 thiếu id (có in) và thừa pa/as/mai; a018 thiếu 1-2 mã. A048/A049 chỉ 13 mã có bản dịch đủ (LanguageManager.codes) + resourceConfigurations 13 mã. audit trên A048 khớp nhầm domain/model/clas/TranslateLanguageModel.kt (ngôn ngữ dịch, không phải list UI)."
   },
   {
    "id": "MO-33",
@@ -4610,6 +4625,13 @@
         "a014"
        ],
        "note": "giây, default 4, cộng dồn qua các lần resume"
+      },
+      {
+       "key": "language_config.hint_delay_second",
+       "apps": [
+        "a045"
+       ],
+       "note": "a045 từ v1.0.9, default 5"
       }
      ]
     },
@@ -4625,9 +4647,11 @@
         "a034",
         "a037",
         "a042",
-        "a045"
+        "a045",
+        "a048",
+        "a049"
        ],
-       "note": "chỉ vị trí dòng có ngón tay (1-based)"
+       "note": "chỉ chọn dòng có ngón tay (1-based), không dời ngôn ngữ máy; default a048/a049 1, a037 4; A048 không kẹp, A049 kẹp 1..n; a045 bỏ field này từ v1.0.9 (ngón tay luôn ở dòng ngôn ngữ máy)"
       },
       {
        "key": "language_order",
@@ -4658,9 +4682,10 @@
    "qc": [
     "Mở FO, không chạm, bấm giờ → ngón tay đúng dòng máy sau N giây; đổi RC = 5 → 5 giây",
     "Back 3 lần → không thoát app",
-    "App có enable_new_language_selection_ui: thử language_oder = 0 và 3"
+    "App có enable_new_language_selection_ui: thử language_oder = 0 và 3",
+    "Kiểu A048: finger_position = 0 / 3 / lớn hơn số dòng; ngón tay chỉ nút tick 2s sau khi chọn"
    ],
-   "notes": "Static không đo được số giây; img_click cũng dùng cho hint Select ở a045."
+   "notes": "Static không đo được số giây; img_click cũng dùng cho hint Select ở a045. A048/A049 không có RC delay: cứng 3s (LanguageViewModel.HINT_DELAY_MS) tính từ lúc tạo ViewModel; thêm ngón tay chỉ nút tick 2s sau khi chọn (TICK_HINT_DELAY_MS)."
   },
   {
    "id": "MO-37",
@@ -5978,6 +6003,13 @@
         "a045"
        ],
        "note": "cùng tên"
+      },
+      {
+       "key": "select_config.btn_skip",
+       "apps": [
+        "a045"
+       ],
+       "note": "a045 từ v1.0.9 (trước đó select_btn_skip)"
       }
      ]
     },
@@ -6023,6 +6055,13 @@
         "a027"
        ],
        "note": "cùng tên"
+      },
+      {
+       "key": "select_config.buffer_alt",
+       "apps": [
+        "a045"
+       ],
+       "note": "a045 từ v1.0.9, default false"
       }
      ]
     },
@@ -6038,6 +6077,13 @@
         "a027"
        ],
        "note": "cùng tên"
+      },
+      {
+       "key": "select_config.min_ad_interval_alt",
+       "apps": [
+        "a045"
+       ],
+       "note": "a045 từ v1.0.9, 1000"
       }
      ]
     },
@@ -6054,6 +6100,13 @@
         "a045"
        ],
        "note": "cùng tên"
+      },
+      {
+       "key": "select_config.preparing.countdown_time",
+       "apps": [
+        "a045"
+       ],
+       "note": "a045 từ v1.0.9, giây, 5"
       }
      ]
     },
@@ -6076,6 +6129,13 @@
         "a045"
        ],
        "note": "default 15"
+      },
+      {
+       "key": "select_config.preparing.auto_pass_time",
+       "apps": [
+        "a045"
+       ],
+       "note": "a045 từ v1.0.9, giây, 10 (key phẳng cũ 15)"
       }
      ]
     }
@@ -6109,7 +6169,8 @@
         "a028",
         "a036",
         "a037",
-        "a039"
+        "a039",
+        "a048"
        ]
       }
      ]
@@ -6125,7 +6186,8 @@
         "a028",
         "a036",
         "a037",
-        "a039"
+        "a039",
+        "a048"
        ]
       }
      ]
@@ -8823,10 +8885,10 @@
        "key": "time_show_button_X_fsn",
        "apps": [
         "a044",
-        "a045",
-        "a047"
+        "a047",
+        "a049"
        ],
-       "note": "giây, 5, đếm ngầm"
+       "note": "giây, 5, đếm ngầm; a047/a049 đếm từ lúc ad hiện khi FSN là trang hiện tại; a049 0 = X hiện ngay"
       },
       {
        "key": "time_close_FS_onboard",
@@ -8841,6 +8903,13 @@
         "a036"
        ],
        "note": "field native position trong ads_config tự viết"
+      },
+      {
+       "key": "onboard_config.fsn_close_second",
+       "apps": [
+        "a045"
+       ],
+       "note": "a045 từ v1.0.9, giây, 5 (trước đó time_show_button_X_fsn)"
       }
      ]
     },
@@ -8872,12 +8941,12 @@
     {
      "name": "screen_show",
      "params": "screen_name=ScrNativeFullScreen",
-     "note": "a027 ScrNativeFullScreen12/23, a016 ScrOnboardFSN12/23, a034/a037 ScrNativeFullScreen1/2, a045 ScrOnboardFsn<n>"
+     "note": "a027 ScrNativeFullScreen12/23, a016 ScrOnboardFSN12/23, a034/a037 ScrNativeFullScreen1/2, a045 ScrOnboardFsn<n>; a039/a047/a048/a049 ScrNativeFullScreen1/2"
     },
     {
      "name": "button_click",
      "params": "button_name=BtnContinueToApp",
-     "note": "a027 BtnCloseAds, a045 BtnCloseOnboardAd"
+     "note": "a027 BtnCloseAds, a045 BtnCloseOnboardAd; a047 BtnCloseFullScreenAd, a048 BtnMaybeLater, a039/a049 BtnClose"
     },
     {
      "name": "iaa_click",
@@ -8955,7 +9024,9 @@
        "name": "fs_onboard_2",
        "apps": [
         "a044",
-        "a045"
+        "a045",
+        "a048",
+        "a049"
        ]
       }
      ]
@@ -8969,13 +9040,13 @@
      "\"action_clicked_(new_)?native_(fsn\\d?|fsob\\d*)\"",
      "\\bclickedNativeFsn\\b",
      "\"native_full_(time_to_countdown|auto_pass_time)\"",
-     "\"(time_close_fsn_ob|time_close_fsob12|onboard_2fsn_close_countdown|show_close_native_fs_countdown|time_show_button_X_fsn|time_close_FS_onboard|fsn_auto_next_onboard)\"",
+     "\"(time_close_fsn_ob|time_close_fsob12|onboard_2fsn_close_countdown|show_close_native_fs_countdown|time_show_button_X_fsn|fsn_close_second|time_close_FS_onboard|fsn_auto_next_onboard)\"",
      "\\bFsnPage\\b",
      "\\bNativeAdClickAction\\(|\\bActionClicked\\.(NEXTSCREEN|NONE|TOOLTIP|DISABLE|RELOAD|CUSTOM)"
     ],
     "all": [
      "\"action_clicked_(new_)?native_(fsn|fsob)\\w*\"",
-     "\"(native_full_time_to_countdown|time_close_fsn_ob|time_close_fsob12|onboard_2fsn_close_countdown|show_close_native_fs_countdown|time_show_button_X_fsn|time_close_FS_onboard)\"",
+     "\"(native_full_time_to_countdown|time_close_fsn_ob|time_close_fsob12|onboard_2fsn_close_countdown|show_close_native_fs_countdown|time_show_button_X_fsn|fsn_close_second|time_close_FS_onboard)\"",
      "\"native_full_close_btn\""
     ]
    },
@@ -8986,7 +9057,7 @@
     "Ma trận after-click cho fsn (QC MO-56), làm cả với ad mượn từ splash.",
     "Có key tắt nút: đặt false → không có pill/X, vuốt qua được, tự qua theo auto-pass."
    ],
-   "notes": "Không phải alias: native_full_pre_countdown_time / native_full_pre_auto_pass_time (màn Preparing, nhóm select). Một key T dùng 2 lần → tổng ≈ 2×T + auto-pass (default 6 s). Đơn vị A013 là ms, app khác là giây — không đổi kiểu/đơn vị key đã phát hành. Timer A013 chạy theo trang, không theo trạng thái ad (A045 OnboardAdContent chỉ đếm từ SUCCESS/IMPRESSED, FAIL thì tự qua). a034/a036 khoá userScrollEnabled tới khi có X. Cần MO chốt: tên key bật/tắt nút, có tắt auto-pass không. App dùng `actionClicked` của ads_config qua `NativeAdClickAction`/`ActionClicked` (vd a037) thay vì RC `action_clicked_*` → audit ra partial; đọc code để kết luận."
+   "notes": "Không phải alias: native_full_pre_countdown_time / native_full_pre_auto_pass_time (màn Preparing, nhóm select). Một key T dùng 2 lần → tổng ≈ 2×T + auto-pass (default 6 s). Đơn vị A013 là ms, app khác là giây — không đổi kiểu/đơn vị key đã phát hành. Timer A013 chạy theo trang, không theo trạng thái ad (A045 OnboardAdContent chỉ đếm từ SUCCESS/IMPRESSED, FAIL thì tự qua). a034/a036 khoá userScrollEnabled tới khi có X. Cần MO chốt: tên key bật/tắt nút, có tắt auto-pass không. App dùng `actionClicked` của ads_config qua `NativeAdClickAction`/`ActionClicked` (vd a037) thay vì RC `action_clicked_*` → audit ra partial; đọc code để kết luận. A048 dùng cùng key native_full_time_to_countdown (ms 2000) nhưng đếm 1 lần ngay khi vào trang, có Maybe Later, không auto-pass. A048/A049 không có action_clicked_native_fsn (nameSpace actionClicked: reload). FSN FAIL khi user đang đứng: A049 đi theo chiều đang đi, A048 luôn đi tới. Góc AdChoices: field adChoicesPlacement của adunit."
   },
   {
    "id": "MO-60",
@@ -9451,7 +9522,7 @@
     "Ad Meta (mediation test) → dùng layoutMeta.",
     "Màn nhỏ: layout cao không đẩy mất nút Next/indicator."
    ],
-   "notes": "Key sai không báo lỗi; a039 ghi nhận native_full_screen có trong bảng nhưng không resolve, phải dùng native_fsn_filled. FSN thiếu fallback full màn → native nhỏ giữa trang trắng. CTA native không trùng màu nút app. ads_config trên Firebase thắng file trong repo."
+   "notes": "Key sai không báo lỗi; a039 ghi nhận native_full_screen có trong bảng nhưng không resolve, phải dùng native_fsn_filled. FSN thiếu fallback full màn → native nhỏ giữa trang trắng. CTA native không trùng màu nút app. ads_config trên Firebase thắng file trong repo. A048 FSN dùng layout riêng native_full_t2e qua defaultNativeLayout; key ngoài AdLayout nên RC chỉ đổi được sang key của SDK."
   },
   {
    "id": "MO-62",
@@ -9832,9 +9903,10 @@
    "qc": [
     "Cờ bật: OB1 → OB2 → OB1 thấy ad khác, log có request mới cho onboard_1.",
     "Cờ tắt: ad giữ nguyên, không request.",
-    "A013: reload_ob3=false → OB3 trống (bug đã biết); app đã sửa thì OB3 vẫn có ad lần đầu."
+    "A013: reload_ob3=false → OB3 trống (bug đã biết); app đã sửa thì OB3 vẫn có ad lần đầu.",
+    "Cờ reload tắt: OB1 → FSN → OB1, ad OB1 phải giữ nguyên"
    ],
-   "notes": "a016/a037/a042/a045/a047 lấy cờ reload từ reloadWhenResume của nameSpace trong ads_config thay cho RC phẳng. loadAd khi ad SUCCESS còn hạn là no-op; ép đổi ad phải reset() trước. Đừng lấy cờ theo trang từ reloadWhenResume nếu SDK cũng reload lúc resume (nạp chồng, a039 CHANGELOG). Recipe: load nếu chưa có ad, reload chỉ khi cờ bật (AdGroupUnit.loadOrReload ở a045/a044 ads/AdGroupUnitExt.kt, a037/a039 ads/AdGroupCompat.kt)."
+   "notes": "a016/a037/a042/a045/a047 lấy cờ reload từ reloadWhenResume của nameSpace trong ads_config thay cho RC phẳng. loadAd khi ad SUCCESS còn hạn là no-op; ép đổi ad phải reset() trước. Đừng lấy cờ theo trang từ reloadWhenResume nếu SDK cũng reload lúc resume (nạp chồng, a039 CHANGELOG). Recipe: load nếu chưa có ad, reload chỉ khi cờ bật (AdGroupUnit.loadOrReload ở a045/a044 ads/AdGroupUnitExt.kt, a037/a039 ads/AdGroupCompat.kt). A048: không cờ RC, mỗi lần dừng trang nạp lại bộ unit cố định gồm cả trang đang xem; A049: ±2 trang, bỏ trang đang xem. View SDK tự loadAd khi vào composition/ON_RESUME nếu nameSpace bật reloadWhenResume."
   },
   {
    "id": "MO-63",
@@ -10152,9 +10224,11 @@
    "qc": [
     "adb logcat | grep -iE 'iaa_impression|ad_placement' khi vừa vào OB1: đúng 2 placement.",
     "Layout Inspector: page width = màn − 2px.",
-    "enable_ob2=false: đứng OB1 thì impression ob1 + FSN (trang kề mới)."
+    "enable_ob2=false: đứng OB1 thì impression ob1 + FSN (trang kề mới).",
+    "App 2 FSN (A048/A049): đứng OB1 thấy impression onboard_1 + fs_onboard",
+    "Log SDK onAdImpression có name= của adunit → lọc theo slot"
    ],
-   "notes": "1.dp ≠ 1px. Native trong trang có padding ngang → cột 1px lộ ra là nền, mất impression. beyondViewportPageCount lớn mà không gate nearActive → native trang xa compose ngoài màn, tốn request (SDK docs_final/FO_ADS_FLOW.md §4). Gắn screen cho unit (AdGroupUnit.of(placement, screen=...)) để ad_placement đúng trang — a027/a045/a047/a037/a039 có, A013 chưa; a027 tráo nhãn screen 12/23 của 2 unit FSN. A013 không truyền key cho pager và screen_show tính theo index cứng. Số trang phụ thuộc trạng thái ad phải bọc derivedStateOf."
+   "notes": "1.dp ≠ 1px. Native trong trang có padding ngang → cột 1px lộ ra là nền, mất impression. beyondViewportPageCount lớn mà không gate nearActive → native trang xa compose ngoài màn, tốn request (SDK docs_final/FO_ADS_FLOW.md §4). Gắn screen cho unit (AdGroupUnit.of(placement, screen=...)) để ad_placement đúng trang — a027/a045/a037/a039/a049 có; A013, a047, a048 chưa (SDK chép screen sang adunit con lúc nạp, AdGroupUnit.createChild); a027 tráo nhãn screen 12/23 của 2 unit FSN. A013 không truyền key cho pager và screen_show tính theo index cứng. Số trang phụ thuộc trạng thái ad phải bọc derivedStateOf."
   },
   {
    "id": "MO-65",
@@ -10390,9 +10464,10 @@
    "recipe": "references/onboarding.md § MO-65",
    "qc": [
     "Dừng ở OB2 → log có impression fs_onboard.",
-    "Cho FSN no-fill (tắt nameSpace) → trang kề là OB3, có impression onboard_3."
+    "Cho FSN no-fill (tắt nameSpace) → trang kề là OB3, có impression onboard_3. App chốt danh sách trang theo enable (A048, A049): cho unit no-fill thay vì tắt nameSpace, tắt là trang FSN không có mặt.",
+    "App 2 FSN: dừng ở OB2 → impression fs_onboard + onboard_2 + fs_onboard_2"
    ],
-   "notes": "FSN chỉ có mặt khi ad có thể hiện; đứng OB1/OB2 mà chưa có FSN thì loadAdForKind retry FSN; không chèn FSN khi user đã qua slot. Impression trang kề không kích timer pill FSN."
+   "notes": "FSN chỉ có mặt khi ad có thể hiện; đứng OB1/OB2 mà chưa có FSN thì loadAdForKind retry FSN; không chèn FSN khi user đã qua slot. Impression trang kề không kích timer pill FSN. App chốt danh sách trang theo enable (A048/A049): FSN no-fill vẫn giữ chỗ, trang 1px kề là trang trống."
   },
   {
    "id": "MO-66",
@@ -10640,7 +10715,7 @@
     "Dừng ở FSN 3 s → log có impression onboard_3.",
     "Lướt nhanh OB2 → FSN → OB3: OB3 phải có ad (không trắng quá 1–2 s)."
    ],
-   "notes": "A013 chỉ nạp onboard_3 lần đầu lúc FSN thành trang hiện tại (loadAdForKind, cần reload_ob3=true) nên ad OB3 thường đang LOADING khi trang kề lộ ra; nên nạp trước từ màn trước hoặc từ OB2 (a047 AdsManager.preloadOnboard nạp trước 2 bước)."
+   "notes": "A013 chỉ nạp onboard_3 lần đầu lúc FSN thành trang hiện tại (loadAdForKind, cần reload_ob3=true) nên ad OB3 thường đang LOADING khi trang kề lộ ra; nên nạp trước từ màn trước hoặc từ OB2 (a047 AdsManager.preloadOnboard nạp trước 2 bước). A048 chỉ nạp onboard_3 khi FSN23 là trang hiện tại; A049 nạp từ OB2 (±2 trang)."
   },
   {
    "id": "MO-67",
@@ -10866,7 +10941,7 @@
     "Dừng ở trang cuối → log impression onboard_3 + fs_onboard.",
     "Native màn kế đã có request trước khi bấm Get started."
    ],
-   "notes": "Trang cuối còn kích preload ad màn kế (loadNativeNextOnboard) và inter inter_ob_3 (từ trang áp chót). Pill FSN đang đếm dở dừng khi user rời FSN, quay lại thì đếm tiếp."
+   "notes": "Trang cuối còn kích preload ad màn kế (loadNativeNextOnboard) và inter inter_ob_3 (từ trang áp chót). Pill FSN đang đếm dở dừng khi user rời FSN, quay lại thì đếm tiếp. Preload native màn kế: A013/A048 ở trang cuối, A047/A049 ngay khi vào Onboard."
   },
   {
    "id": "MO-68",
@@ -11114,7 +11189,7 @@
      "key": "noti_kill_app_show_all",
      "type": "Boolean",
      "default": "false",
-     "meaning": "ĐỀ XUẤT, chưa app nào có (A013 thiếu): false = chỉ bắn trong FO; true = bắn ở mọi lần app xuống nền. Tên cần MO chốt rồi tạo trên Firebase.",
+     "meaning": "ĐỀ XUẤT, chưa app nào có: false = chỉ bắn trong FO; true = bắn ở mọi lần app xuống nền. A049 từng có `noti_config:kill_app.show_all`, user bỏ ngày 15/10/2026. Chỉ thêm khi MO chốt tên key và user yêu cầu, rồi tạo trên Firebase.",
      "aliases": []
     }
    ],
@@ -11150,10 +11225,10 @@
     "Mở lại app → noti mất",
     "Bấm Home khi ad full-screen đang hiện → không có noti",
     "Popup mất mạng → Enable → Settings → không có noti (MO-88)",
-    "Sau FO thoát app → không có noti; bật noti_kill_app_show_all (áp từ lần mở sau) → có",
+    "Sau FO thoát app → không có noti; app có key noti_kill_app_show_all thì bật lên (áp từ lần mở sau) → có",
     "Dark/light mode"
    ],
-   "notes": "Hiện trạng: chỉ FO ở A013, a016, a031, a036, a037, a039, a041, Langofy, a033; bắn mọi phiên ở A014, a27, A028, a034, a044, A045, A047 — đổi sang FO + RC là đổi hành vi app đã phát hành, phải báo MO. Kill-switch enable_noti_kill_app (A045, A047, a044) là khác nghĩa (bật/tắt hẳn), không phải alias. A013 dùng lại noti này cho click-ads (MO-70). Nhiều app không huỷ noti ở onResume (a016, a036, a037, a039, a041)."
+   "notes": "Hiện trạng: chỉ FO ở A013, a016, a031, a036, a037, a039, a041, Langofy, a033; bắn mọi phiên ở A014, a27, A028, a034, a044, A045, A047, A048, A049 — đổi sang FO + RC là đổi hành vi app đã phát hành, phải báo MO. Kill-switch enable_noti_kill_app (A045, A047, a044) là khác nghĩa (bật/tắt hẳn), không phải alias. A013 dùng lại noti này cho click-ads (MO-70). Nhiều app không huỷ noti ở onResume (a016, a036, a037, a039, a041). A049 (ref A047): bắn mọi phiên ở onStop, chỉ còn kill-switch noti_config.kill_app.enable; bản trước chỉ FO, user chốt theo A047 ngày 15/10/2026 sau bug QC ở Home. A048 bắn mọi phiên ở onStop."
   },
   {
    "id": "MO-70",
@@ -11306,9 +11381,10 @@
     "RC = toast → chỉ toast",
     "Tap noti → Splash → app; kiểm app_open_from",
     "Quay lại app → noti dùng chung id kill-app (A013) bị huỷ",
-    "Dark/light mode"
+    "Dark/light mode",
+    "App có noti click-ads riêng: bấm ad trong FO → chỉ 1 noti, không kèm kill-app"
    ],
-   "notes": "Hiện trạng: dùng lại kill-app ở A013, a016, a27, a034; cùng layout kill nhưng OPEN_FROM riêng ở a037, a039 (a039 luôn bắn, không RC); noti riêng ở A014, a033, a036, a041, Langofy, a044, A045, A047 (A047 lưu backstack vào click_ads_stack); chỉ toast ở A028, a031. Mọi app đều bắn ngay lúc click. Nên làm noti riêng để tách tracking. Nhánh toast thuộc MO-79."
+   "notes": "Hiện trạng: dùng lại kill-app ở A013, a016, a27, a034; cùng layout kill nhưng OPEN_FROM riêng ở a037, a039 (a039 luôn bắn, không RC); noti riêng ở A014, a033, a036, a041, Langofy, a044, A045, A047 (A047 lưu backstack vào click_ads_stack); chỉ toast ở A028, a031. Mọi app đều bắn ngay lúc click. Nên làm noti riêng để tách tracking. Nhánh toast thuộc MO-79. Noti click-ads riêng: A047, A049. Đích khi tap lệch giữa app: A013 Home, A047 màn đang đứng (OPEN_TO_LAST_SCREEN), A049 theo Figma (Horoscopes). Có noti riêng thì kill-app phải bỏ lượt sau click: SDK BaseAds.onAdClicked set disableAdResumeOneTime, A047/A049 kiểm cờ này. click_ad_action = notification mà chưa có quyền noti thì không hiện gì, không toast (A013 setKillAppNotification, A047/A049 showPromo) — open-questions Q51."
   },
   {
    "id": "MO-71",
@@ -11439,7 +11515,8 @@
     "Hoặc mở app 1 lần rồi cmd alarm set-time tới 8:00 + 1h05m (và 19:00 + 1h05m), giữ màn sáng",
     "dumpsys alarm | grep -A4 $P thấy alarm lần kế",
     "Small icon không bị ô vuông; dark/light mode",
-    "Đổi ngôn ngữ app → bắn lại → nội dung theo ngôn ngữ app"
+    "Đổi ngôn ngữ app → bắn lại → nội dung theo ngôn ngữ app",
+    "App có action riêng (A047/A049): -a = hằng ACTION_SHOW_DAILY, tiền tố theo namespace (A047 namespace khác applicationId)"
    ],
    "notes": "Kill-switch tuỳ chọn ở app khác: enable_noti_daily (Boolean, true — A045, A047, a044). Muốn chống mất slot khi mở app sau giờ hẹn thì thêm cửa sổ ân hạn 2h kiểu A047 (noti_armed_at_<req>, noti_fired_day_<req>)."
   },
@@ -11580,7 +11657,7 @@
     "Kill app → mở lại → vào Home → có noti; vào tính năng rồi về Home → không bắn lại trong phiên",
     "Dark/light mode"
    ],
-   "notes": "A013 ghi cờ FO kể cả khi chưa có quyền noti (mất lượt FO khi noti_permission_trigger = home) — chỉ ghi khi allowNotification. A047 không bắn khi Home chỉ là trạm trung chuyển (mở từ noti thẳng vào tính năng). State FO/phiên ở app khác: shown_shortcut_noti_fo, last_shortcut_noti_session (A014, A045, A047, a033, a044); show_shortcut_noti_fo / show_shortcut_noti_in_fo (a016, a036, a037 — nghĩa ngược: true = còn phải bắn). Kill-switch tuỳ chọn: enable_noti_shortcut (A045, A047, a044), show_shortcut_noti (a033). Đừng nhầm scheduleReminder (daily)."
+   "notes": "A013 ghi cờ FO kể cả khi chưa có quyền noti (mất lượt FO khi noti_permission_trigger = home) — chỉ ghi khi allowNotification. A047 không bắn khi Home chỉ là trạm trung chuyển (mở từ noti thẳng vào tính năng). State FO/phiên ở app khác: shown_shortcut_noti_fo, last_shortcut_noti_session (A014, A045, A047, a033, a044); show_shortcut_noti_fo / show_shortcut_noti_in_fo (a016, a036, a037 — nghĩa ngược: true = còn phải bắn). Kill-switch tuỳ chọn: enable_noti_shortcut (A045, A047, a044), show_shortcut_noti (a033). Đừng nhầm scheduleReminder (daily). A047 ghi cờ FO/phiên trước khi kiểm quyền; A049 kiểm quyền + RC trước rồi mới ghi. A048/A049 log open_from=shortcut cho noti shortcut, trùng launcher shortcut; phân biệt bằng notification_clicked type=shortcut."
   },
   {
    "id": "MO-73",
@@ -11715,7 +11792,8 @@
     "Ép nổ (build debug): adb shell run-as $P am broadcast --user 0 -n $P/<FQCN NotificationReceiver> -a <action win-back> (A013: com.example.a013_recovery.action.SHOW_WINBACK)",
     "Hoặc mở app 1 lần rồi cmd alarm set-time tới 11:00 + 1h05m và 14:00 + 1h05m, giữ màn sáng",
     "Collapse có thumbnail, expand có ảnh lớn + nút CTA; CTA/tap → Splash → tính năng; app_open_from = notification_winback",
-    "Dark/light mode; ngày kế vẫn bắn; sau reboot vẫn bắn"
+    "Dark/light mode; ngày kế vẫn bắn; sau reboot vẫn bắn",
+    "App có action riêng (A047/A049): -a = hằng ACTION_SHOW_WINBACK, tiền tố theo namespace"
    ],
    "notes": "MO-4 là dòng trùng của mục này. Kill-switch tuỳ chọn ở app khác: enable_noti_winback (A045, A047, a044); a27 dùng is_show_noti (String, \"winback_progress_shortcut\"). Langofy hẹn 14h/17h (lệch chuẩn). Hay gặp Luật 8: mở app sau 11:00 khi alarm chưa nổ → bị đẩy sang mai."
   },
@@ -11832,12 +11910,12 @@
     {
      "name": "app_open_from",
      "params": "open_from=shortcut_uninstall",
-     "note": "A045 dùng open_from_shortcut; A47 open_from_launcher_uninstall_shortcut"
+     "note": "A045 dùng open_from_shortcut; A47 open_from_launcher_uninstall_shortcut; shortcut tính năng: A013 shortcut_<x>, A048/A049 shortcut"
     },
     {
      "name": "button_click",
      "params": "button_name ∈ BtnBack|BtnHome|BtnKeepUsingApp|BtnUninstallApp|BtnTryNow, screen_name=ScrUninstall, uninstall_feature",
-     "note": "A013 Modifier.onClickNotRipple"
+     "note": "A013 Modifier.onClickNotRipple; A048/A049 BtnTryNow<Feature> (UninstallFeature.clickName, không param), BtnKeepUsing, BtnDeviceBack; A047 BtnUninstallTry|BtnUninstallCard|BtnUninstallKeep|BtnUninstallConfirm|BtnUninstallHome"
     }
    ],
    "placements": [
@@ -11875,9 +11953,12 @@
     "Mở từ shortcut khi app đã kill / đang ở màn sâu → Splash có ads",
     "User mới chưa qua FO vẫn vào ScrUninstall",
     "Nút gỡ → App info; quay lại không có app-open resume",
-    "Dark/light"
+    "Dark/light",
+    "Đổi ngôn ngữ trong app → nhãn shortcut đổi theo",
+    "App có hơn 4 shortcut → shortcut Uninstall vẫn hiện trên Pixel",
+    "Mở lại từ Recents sau khi rời ScrUninstall → không rơi lại ScrUninstall"
    ],
-   "notes": "Policy: màn phải có đường gỡ thật (App info hoặc ACTION_DELETE + fallback). detect không kiểm được 'có shortcut tính năng' — QC bằng tay. A045 có mẹo label 'UninstaII' khi launcher từ chối — rủi ro policy."
+   "notes": "Policy: màn phải có đường gỡ thật (App info hoặc ACTION_DELETE + fallback). detect không kiểm được 'có shortcut tính năng' — QC bằng tay. A045 có mẹo label 'UninstaII' khi launcher từ chối — rủi ro policy. Try ở A047/A048/A049 không có inter (nghiệm thu ghi có, A013 có). Không app nào trong 3 app có RC new_uninstall_enable. Pixel/Launcher3 chỉ hiện 4 shortcut rank thấp nhất. A047 khi launcher từ chối chỉ đổi id thành UninstaII, nhãn giữ chuỗi đã dịch."
   },
   {
    "id": "MO-75",
@@ -12383,12 +12464,12 @@
     {
      "name": "app_open_from",
      "params": "open_from ∈ shortcut_uninstall|widget|notification_daily|notification_pinned|notification_kill|notification_reminder|notification_winback|notification_lock_screen(_un_support)",
-     "note": "A045/A47 dùng tiền tố open_from_ (vd open_from_notification_pinned); a033/a034/a037 log app_<app_name> khi mở thường; A045 log default"
+     "note": "A045/A47 dùng tiền tố open_from_ (vd open_from_notification_pinned); a033/a034/a037 log app_<app_name> khi mở thường; A045 log default; A048/A049 theo danh sách PO: notification_win_back, notification_lockscreen, shortcut (cả shortcut tính năng lẫn noti shortcut), mở thường app_<app_name> (app_translator, app_palm ai)"
     },
     {
      "name": "notification_clicked",
      "params": "type",
-     "note": "A045"
+     "note": "A045, A047, A048, A049"
     }
    ],
    "placements": [
@@ -12452,9 +12533,11 @@
     "Từng lối vào × (kill / background màn sâu / foreground)",
     "Luôn Splash có ads, đúng màn đích",
     "Back từ màn đích không về màn cũ",
-    "app_open_from đúng, không 2 ad liên tiếp"
+    "app_open_from đúng, không 2 ad liên tiếp",
+    "Mở từ noti → về nền → mở lại từ Recents: không mở lại tính năng của noti, không log lại open_from cũ",
+    "Mở lại khi process còn sống: Splash vẫn có inter"
    ],
-   "notes": "Tên hằng pinned lệch: OPEN_FROM_PINNED_NOTIFICATION (a013, sdk, a028, a031, a034, a036, a041 core/ads), OPEN_FROM_NOTIFICATION_PINNED (a014, a016, a044, a045, a047), OPEN_FROM_NOTIFY_PINNED (a033, a042, a041 core/common), OPEN_FROM_PINNED_NOTI (a037, a039). Unit splash riêng cho re-open: MO-99."
+   "notes": "Tên hằng pinned lệch: OPEN_FROM_PINNED_NOTIFICATION (a013, sdk, a028, a031, a034, a036, a041 core/ads), OPEN_FROM_NOTIFICATION_PINNED (a014, a016, a044, a045, a047), OPEN_FROM_NOTIFY_PINNED (a033, a042, a041 core/common), OPEN_FROM_PINNED_NOTI (a037, a039). Unit splash riêng cho re-open: MO-99. Mở lại từ Recents: hệ thống trả intent gốc kèm FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY → phải bỏ qua extras (A047, A049 có lọc; A013 chưa). Process cũ còn sống thì unit splash vẫn IMPRESSED → reset ở onCreate khi mở mới."
   },
   {
    "id": "MO-79",
@@ -12553,7 +12636,8 @@
         "a034",
         "a044",
         "a045",
-        "a047"
+        "a047",
+        "a049"
        ],
        "note": "cùng key, default 'notification'"
       }
@@ -12907,7 +12991,7 @@
    "events": [
     {
      "name": "button_click",
-     "params": "button_name=device_back (A045) | BtnDeviceBack (A47)",
+     "params": "button_name=device_back (A045) | BtnDeviceBack (A47, A048, A049)",
      "note": "nên log back cứng như 1 nút"
     }
    ],
@@ -13005,7 +13089,8 @@
     "preload_inter_buffer_second",
     "time interval inter",
     "khoảng cách inter",
-    "khoang cach inter"
+    "khoang cach inter",
+    "armInterInAppPreload"
    ],
    "requirement": "Interval x giây thì đúng x giây sau lần show trước phải có ad để show: bắt đầu load ở mốc (x − 5)s dù user không chuyển màn.",
    "acceptance": [
@@ -13038,7 +13123,7 @@
      "LocalAllowShowInterInApp",
      "entryTag"
     ],
-    "note": "A013: arm theo mốc tuyệt đối lastShowAds + interval − lead, 3 lần thử cách 3s; gate thực tế = đã có ad. Lệch: không gate thời gian lúc show, canShowInter không dùng, chỉ arm khi đổi màn. Mẫu chặt: a044 ads/AdsManager.kt (canShowInterInApp, armInterPreload, onInterClosed, cancel onStop)."
+    "note": "A013: arm theo mốc tuyệt đối lastShowAds + interval − lead, 3 lần thử cách 3s; gate thực tế = đã có ad. Lệch: không gate thời gian lúc show, canShowInter không dùng, chỉ arm khi đổi màn. Mẫu chặt: a044 ads/AdsManager.kt (canShowInterInApp, armInterPreload, onInterClosed, cancel onStop). Mẫu ref khác: A048 armInterInAppPreload (gate elapsedRealtime từ onAdShow của inter_inapp, huỷ onStop / arm lại onStart; A049 theo); A047 armInterPreload / lastInterClosedAt / startInterPreload."
    },
    "rc_keys": [
     {
@@ -13051,9 +13136,11 @@
        "key": "interval_inter_inapp",
        "apps": [
         "a047",
-        "a042"
+        "a042",
+        "a048",
+        "a049"
        ],
-       "note": "ms; a047 20000, a042 30000"
+       "note": "ms; a047 20000, a042 30000, a048 30000; a049 default 20000 (sheet Ad script, 15/10/2026)"
       },
       {
        "key": "time_interval_inter",
@@ -13096,7 +13183,9 @@
         "a041",
         "a044",
         "a045",
-        "a047"
+        "a047",
+        "a048",
+        "a049"
        ],
        "note": "GIÂY, default 5"
       },
@@ -13171,21 +13260,23 @@
     "any": [
      "\"(preload_lead_inter|preload_inter_buffer_second|second_preload_inter_buffer|preload_inter_interval)\"",
      "\"(interval_skip_inter|interval_inter_inapp|time_interval_inter|inter_all_interval)\"",
-     "schedulePreloadInterInApp|armInterPreload|preloadInter\\w*AfterClose"
+     "schedulePreloadInterInApp|armInterPreload|preloadInter\\w*AfterClose|armInterInAppPreload"
     ],
     "all": [
      "\"(preload_lead_inter|preload_inter_buffer_second|second_preload_inter_buffer|preload_inter_interval)\"",
      "(intervalSkipInter|\"interval_inter_inapp\"|\"time_interval_inter\"|\"inter_all_interval\"|interAllInterval|intervalInterInApp|timeIntervalInter)",
-     "(schedulePreloadInterInApp|armInterPreload|preloadInter\\w*AfterClose|delayTime\\s*=)"
+     "(schedulePreloadInterInApp|armInterPreload|preloadInter\\w*AfterClose|delayTime\\s*=)|armInterInAppPreload"
     ]
    },
    "recipe": "references/inapp-ads.md § MO-82",
    "qc": [
     "interval 20s, lead 5s: show → đứng yên → ~giây 15 có request → giây 20 trigger thấy ad",
     "Trigger ở giây 10 → không ad",
-    "Ra nền 30s → không request lúc ở nền"
+    "Ra nền 30s → không request lúc ở nền",
+    "A048/A049: grep logcat armInterInAppPreload|loadAd: placement=inter_inapp|InterstitialAdUnit.*show: (A013 tìm arm: / fire load, tag AdsManager)",
+    "A048/A049 có inter splash: request inter_inapp đầu tiên chỉ bắn khi đóng ad splash (chờ isShowingAds hạ); A013 gặp isShowingAds thì bỏ lượt nạp"
    ],
-   "notes": "Đơn vị lệch ms/giây giữa app. min_ad_interval_alt (a037) / min_ad_interval_language_alt (A013) KHÔNG phải interval inter."
+   "notes": "Đơn vị lệch ms/giây giữa app. min_ad_interval_alt (a037) / min_ad_interval_language_alt (A013) KHÔNG phải interval inter. A048 có thêm inter_inapp_use_count (Long 3, đếm lượt theo tính năng trong RAM theo phiên, AND với interval), không phải alias của screen_skip_inter."
   },
   {
    "id": "MO-83",
@@ -13433,9 +13524,10 @@
    "qc": [
     "Đo icon → inter (stopwatch hoặc splash_show) trước/sau thay đổi.",
     "Mạng tốt: FO chỉ tốn UMP + thời gian load ad.",
-    "Offline: không tự đi tiếp."
+    "Offline: không tự đi tiếp.",
+    "Đo bằng giờ trong logcat; emulator lệch giờ host ~2s"
    ],
-   "notes": "Không detect đủ bằng regex; dấu hiệu xấu cần grep tay trong file splash: smoothProgress, delay(<số lớn>), splashProgressFinalized. Bỏ chờ RC/init tăng rủi ro MO-17/MO-22 và ANR (a037 P1624)."
+   "notes": "Không detect đủ bằng regex; dấu hiệu xấu cần grep tay trong file splash: smoothProgress, delay(<số lớn>), splashProgressFinalized. Bỏ chờ RC/init tăng rủi ro MO-17/MO-22 và ANR (a037 P1624). A048 bắn init_splash_time (value = giây) ở SplashViewModel.nextScreen."
   },
   {
    "id": "MO-85",
@@ -13652,7 +13744,7 @@
     "Không hỏi lại; chạm trần rating_max_show",
     "Đổi RC trigger"
    ],
-   "notes": "Chuẩn mục này là A045 RatingGate (không phải A013). Default code A045 rate_success_trigger=2 → hiện ở lượt 2; spec 'hơn 2 lần' cần MO đặt 3. A014 hiện đếm trong RAM (reset mỗi session)."
+   "notes": "Chuẩn mục này là A045 RatingGate (không phải A013). Default code A045 rate_success_trigger=2 → hiện ở lượt 2; spec 'hơn 2 lần' cần MO đặt 3. A014 hiện đếm trong RAM (reset mỗi session). SDK chỉ khai star_review_to_store trong AdsSharedPref, không tự đọc: app tự làm sao ≥ ngưỡng → Store."
   },
   {
    "id": "MO-86",
@@ -13750,7 +13842,7 @@
    "events": [
     {
      "name": "button_click",
-     "params": "button_name=BtnBack|BtnSave, screen_name=ScrLanguageAlt, language",
+     "params": "button_name=BtnBack|BtnSave|BtnDeviceBack, screen_name=ScrLanguageAlt (A048/A049 cả ScrLanguage), language",
      "note": ""
     },
     {
@@ -13776,7 +13868,9 @@
       {
        "name": "native_popup_lang",
        "apps": [
-        "a016"
+        "a016",
+        "a048",
+        "a049"
        ]
       },
       {
@@ -13806,11 +13900,11 @@
    ],
    "detect": {
     "any": [
-     "showSaveHint|showSaveButton|SaveHintButton|ConfirmDeviceLanguageDialog|action_click_back_lang|ConfirmLangDialog"
+     "showSaveHint|showSaveButton|SaveHintButton|ConfirmDeviceLanguageDialog|action_click_back_lang|ConfirmLangDialog|showConfirmLanguage\\s*=\\s*true"
     ],
     "all": [
      "showSaveHint\\s*=\\s*true|showSaveButton\\s*=\\s*(?:true|!)|SaveHintButton\\(",
-     "ConfirmDeviceLanguageDialog|action_click_back_lang|isShowConfirmLangDialog\\s*=\\s*true|showConfirmDialog\\s*=\\s*true|autoConfirm\\s*=\\s*true"
+     "ConfirmDeviceLanguageDialog|action_click_back_lang|isShowConfirmLangDialog\\s*=\\s*true|showConfirmDialog\\s*=\\s*true|autoConfirm\\s*=\\s*true|showConfirmLanguage\\s*=\\s*true"
     ]
    },
    "recipe": "references/language.md § MO-86",
@@ -13819,7 +13913,7 @@
     "Android 14: vuốt cạnh ở Normal và Alt",
     "Popup đang mở → back đóng popup, không mở chồng"
    ],
-   "notes": "Không bắt buộc RC. Key ở app khác: a016 action_click_back_lang (Long 1 popup trợ giúp | 2 popup 'Start in this language?' | 3 đứng yên; default 1) + confirm_popup_opt2_content (gotohome | khác = Cancel); a044 confirm_popup_opt2_content (trynow | cancel); a047 language_config.confirm_popup_opt2_content. showConfirmDialog = true ở detect.all là tín hiệu yếu."
+   "notes": "Không bắt buộc RC. Key ở app khác: a016 action_click_back_lang (Long 1 popup trợ giúp | 2 popup 'Start in this language?' | 3 đứng yên; default 1) + confirm_popup_opt2_content (gotohome | khác = Cancel); a044 confirm_popup_opt2_content (trynow | cancel); a047 language_config.confirm_popup_opt2_content. showConfirmDialog = true ở detect.all là tín hiệu yếu. Biến thể A048/a037 (A049 theo A048): back ở cả Normal lẫn Alt → popup confirm, không có nút Save; Confirm ở Normal áp ngôn ngữ rồi đi thẳng language_next, bỏ qua Alt (mất impression language_alt)."
   },
   {
    "id": "MO-87",
@@ -14017,7 +14111,7 @@
     "Test cả máy Android 10+ (panel nổi) lẫn máy mở trang Settings toàn màn hình",
     "Bật mạng → app tự quay về; bấm Home ở màn FO → kill-app vẫn hiện"
    ],
-   "notes": "Hiện trạng: có ở A013, A014 (commit c5c2db1 'Checklist MO 88 + 90'), a033, a036, a037, a039, a044, A047, a27 (a27 thêm cờ một-lần có thể nuốt lượt kill-app kế); a031 không áp dụng (kill-app ở onDestroy). Chưa có: a016, A028, a041. Thiếu một phần: A045 (onStop không kiểm cờ); a034, Langofy không set cờ cho intent panel (suy luận). Audit chỉ heuristic: phải đọc hàm mở Settings để chắc cờ được set ngay trước startActivity."
+   "notes": "Hiện trạng: có ở A013, A014 (commit c5c2db1 'Checklist MO 88 + 90'), a033, a036, a037, a039, a044, A047, a27 (a27 thêm cờ một-lần có thể nuốt lượt kill-app kế); a031 không áp dụng (kill-app ở onDestroy). Chưa có: a016, A028, a041. Thiếu một phần: A045 (onStop không kiểm cờ); a034, Langofy không set cờ cho intent panel (suy luận). Audit chỉ heuristic: phải đọc hàm mở Settings để chắc cờ được set ngay trước startActivity. A049 có (ExternalScreen.opening set ở startExternal trong common/Commons.kt và PermissionSettingsGuide.open — gồm nút mở Wi-Fi của OvlNoInternet qua MainActivity.openInternetSettings; trigger kiểm thêm cờ SDK). Helper SDK 1.8.7 (openWifiSetting, openWebsite, shareApp) chỉ set cờ của SDK → app có cờ riêng phải kiểm cả hai."
   },
   {
    "id": "MO-89",
@@ -14210,7 +14304,7 @@
      "POLL_INTERVAL_MS",
      "POLL_MAX_ATTEMPTS"
     ],
-    "note": "Poll 200ms sau 1s, tối đa 300 lần; có quyền → start MainActivity (singleTask) NEW_TASK; user tự về thì dừng. Mẫu helper chung ở app khác: checkSettingOn + FLAG_ACTIVITY_REORDER_TO_FRONT (A014, a016, a027, a034, a044, A045)."
+    "note": "Poll 200ms sau 1s, tối đa 300 lần; có quyền → start MainActivity (singleTask) NEW_TASK; user tự về thì dừng. Mẫu helper chung ở app khác: checkSettingOn + FLAG_ACTIVITY_REORDER_TO_FRONT (A014, a016, a027, a034, a044, A045). A048 common/utils/SettingsReturn.kt checkSettingOn (chỉ Wi-Fi); A049 common/utils/PermissionSettingsGuide.kt (camera, và từ 15/10/2026 cả Wi-Fi của popup mất mạng MO-26; theo A013)."
    },
    "rc_keys": [],
    "events": [
@@ -14238,7 +14332,9 @@
    "recipe": "references/misc.md § MO-90",
    "qc": [
     "Android 10/13/14/15, Pixel + Xiaomi/Samsung",
-    "Bật ngay / bật sau 30s / rời sang app khác rồi bật / không bật mà back"
+    "Bật ngay / bật sau 30s / rời sang app khác rồi bật / không bật mà back",
+    "Quyền runtime đã bị từ chối hẳn → mở Settings bật → app tự lên lại",
+    "Kéo app về không sinh app_open_from mới, không đi qua Splash"
    ],
    "notes": "Giới hạn background activity start: Settings phải mở từ Activity, cùng task. Android 14+ đóng băng app ~10s sau khi mất cửa sổ → poll treo, phải kiểm lại lúc resume."
   },
@@ -14330,7 +14426,7 @@
    "events": [
     {
      "name": "button_click",
-     "params": "button_name=BtnBack|BtnHome, screen_name=ScrUninstall",
+     "params": "button_name=BtnBack|BtnHome|BtnDeviceBack (A047/A048/A049)|BtnUninstallHome (A047), screen_name=ScrUninstall",
      "note": ""
     }
    ],
@@ -14344,19 +14440,20 @@
      "ScrUninstall\\b",
      "AppDestination\\.Uninstall\\b",
      "onKeepUsingAppClick",
-     "backToHome",
+     "backToHome|backToMain",
      "BtnKeepUsingApp"
     ],
     "all": [
      "(ScrUninstall|AppDestination\\.Uninstall)\\b",
-     "(onKeepUsingAppClick|backToHome|onKeepApp|popToMain)"
+     "(onKeepUsingAppClick|backToHome|onKeepApp|popToMain)|backToMain"
     ]
    },
    "recipe": "references/reopen.md § MO-91",
    "qc": [
     "Android ≤13 nút back, Android 14+ vuốt 2 mép",
     "Mở từ shortcut khi app kill / background",
-    "Back không rơi vào popup Exit của Home"
+    "Back không rơi vào popup Exit của Home",
+    "Try 1 tính năng → back → về Home, không về ScrUninstall"
    ],
    "notes": "detect chỉ thấy có hàm về Home; KHÔNG kiểm được back cứng đã nối hay chưa — QC bằng tay (A013 đang thoát app khi back cứng)."
   },
@@ -14479,7 +14576,7 @@
     {
      "name": "button_click",
      "params": "button_name=SwipeGetStarted",
-     "note": "a047 có; A013 không log riêng; a037 log BtnNext"
+     "note": "a047 có; A013 không log riêng; a037 log BtnNext; a048/a049 log BtnNext"
     }
    ],
    "placements": [],
@@ -14504,7 +14601,7 @@
     "RTL: vuốt trái → phải ở trang cuối → đi.",
     "Bấm Get started rồi vuốt ngay → chỉ 1 lần navigate."
    ],
-   "notes": "Recipe tốt hơn A013: ngưỡng dp (32–48dp), hướng tiến theo LocalLayoutDirection, chỉ NestedScrollSource.UserInput, bắt cả onPostFling, cờ bắn 1 lần — xem a047 OnboardContent (swipeGetStartedConnection), a041/a037/a039. Kiểu trang câm (a034) lộ trang trống. Trang cuối là FSN (enable_ob3=false): vuốt cũng rời, không có inter_ob_3. a033 bắt drag bằng pointerInput + detectHorizontalDragGestures + canScrollForward (overSwipeToFinish)."
+   "notes": "Recipe tốt hơn A013: ngưỡng dp (32–48dp), hướng tiến theo LocalLayoutDirection, chỉ NestedScrollSource.UserInput, bắt cả onPostFling, cờ bắn 1 lần — xem a047 OnboardContent (swipeGetStartedConnection), a041/a037/a039. Kiểu trang câm (a034) lộ trang trống. Trang cuối là FSN (enable_ob3=false): vuốt cũng rời, không có inter_ob_3. a033 bắt drag bằng pointerInput + detectHorizontalDragGestures + canScrollForward (overSwipeToFinish). A049 rememberSwipeToFinishConnection (48dp, hướng theo RTL); A048 finishOnSwipe (100px, không lọc UserInput, không bắt fling)."
   },
   {
    "id": "MO-93",
@@ -14808,6 +14905,13 @@
         "a039"
        ],
        "note": ""
+      },
+      {
+       "key": "language_config.confirm",
+       "apps": [
+        "a045"
+       ],
+       "note": "a045 từ v1.0.9, default true"
       }
      ]
     }
@@ -14846,7 +14950,9 @@
       {
        "name": "native_popup_lang",
        "apps": [
-        "a016"
+        "a016",
+        "a048",
+        "a049"
        ]
       },
       {
@@ -14889,7 +14995,7 @@
     "Logcat iaa_impression placement=popup_lang",
     "Click ad trong popup → quay lại: xác nhận luôn (nếu đã làm theo recipe)"
    ],
-   "notes": "Biến thể: a027/a014 chỉ hỏi khi chạm lại đúng dòng đang chọn (callback onReselect); A013/a045/a037 hỏi khi chạm lại bất kỳ dòng đã từng chạm (tappedLanguages / tappedCodes / visitedCodes). confirm_language ở vài app vừa là RC vừa là tên placement popup."
+   "notes": "Biến thể: a027/a014 chỉ hỏi khi chạm lại đúng dòng đang chọn (callback onReselect); A013/a045/a037 hỏi khi chạm lại bất kỳ dòng đã từng chạm (tappedLanguages / tappedCodes / visitedCodes). confirm_language ở vài app vừa là RC vừa là tên placement popup. A048/A049: chạm lại bất kỳ dòng đã chạm (tappedCodes) mở popup; popup native_popup_lang nạp sẵn từ màn Normal, chữ theo ngôn ngữ đang chọn, dùng chung với back (MO-86)."
   },
   {
    "id": "MO-95",
@@ -15030,14 +15136,16 @@
        "key": "show_lockscreen_noti",
        "apps": [
         "a033",
-        "a034"
+        "a034",
+        "a048"
        ],
        "note": "cùng nghĩa"
       },
       {
        "key": "noti_config:lockscreen.enable",
        "apps": [
-        "a037"
+        "a037",
+        "a049"
        ],
        "note": "RC gom JSON nhóm noti_config"
       }
@@ -15069,6 +15177,13 @@
         "a037"
        ],
        "note": "JSON nhóm: lockscreen.slots"
+      },
+      {
+       "key": "noti_config:lockscreen.slots",
+       "apps": [
+        "a049"
+       ],
+       "note": "default 11:30,17:00,20:00"
       }
      ]
     },
@@ -15076,7 +15191,7 @@
      "key": "noti_lockscreen_slots_new",
      "type": "String",
      "default": "11:30,17:00,20:00",
-     "meaning": "Giờ bắn cho user mới (A013: cài < 24h theo firstInstallTime). Định nghĩa 'mới' lệch: a016 anchor < 24h, A014 first_open, a041 firstOnboard. Default A047 09:00,13:00,19:00.",
+     "meaning": "Giờ bắn cho user mới (A013: < 24h từ pref first_install_time ghi ở lần mở đầu; A047/A049: PackageInfo.firstInstallTime; A048: cờ firstOpen, tức chưa qua FO — Q52). Định nghĩa 'mới' lệch: a016 anchor < 24h, A014 first_open, a041 firstOnboard. Default A047 09:00,13:00,19:00.",
      "aliases": [
       {
        "key": "noti_config",
@@ -15084,6 +15199,13 @@
         "a037"
        ],
        "note": "JSON nhóm: lockscreen.slots_new"
+      },
+      {
+       "key": "noti_config:lockscreen.slots_new",
+       "apps": [
+        "a049"
+       ],
+       "note": "default 09:00,13:00,19:00"
       }
      ]
     },
@@ -15107,7 +15229,8 @@
        "apps": [
         "a044",
         "a033",
-        "a041"
+        "a041",
+        "a048"
        ],
        "note": "cùng nghĩa"
       },
@@ -15124,12 +15247,13 @@
      "key": "noti_lockscreen_replace",
      "type": "Boolean",
      "default": "false",
-     "meaning": "true = slot mới huỷ noti cũ chưa xử lý rồi bắn; false = bỏ lượt. Default true ở a037, a039, A045, Langofy.",
+     "meaning": "true = slot mới huỷ noti cũ chưa xử lý rồi bắn; false = bỏ lượt. Default true ở a037, a039, A045, A048, Langofy.",
      "aliases": [
       {
        "key": "noti_config:lockscreen.replace",
        "apps": [
-        "a037"
+        "a037",
+        "a049"
        ],
        "note": "RC gom JSON nhóm noti_config"
       }
@@ -15146,7 +15270,7 @@
        "apps": [
         "a047"
        ],
-       "note": "JSON {full_scr_intent: true, full_scr_intent_retrigger: 2}"
+       "note": "JSON {full_scr_intent: true, full_scr_intent_retrigger: 2}; a047 default bật"
       }
      ]
     },
@@ -15242,9 +15366,11 @@
     "Kịch bản: overlay khi màn tắt/khoá; CTA → Splash → tính năng; X → đóng + huỷ; rời overlay rồi tắt-bật màn → hiện lại",
     "appops set $P USE_FULL_SCREEN_INTENT deny → chỉ heads-up + notification_lockscreen_un_support",
     "Bắn 2 lần liên tiếp không bấm gì → lần 2 bỏ lượt (replace = false); mở app → noti mất; đổi ngôn ngữ app → đúng ngôn ngữ; dark/light",
-    "Bẫy QC: force-stop xoá alarm + noti (dùng run-as kill -9); am kill không giết được trên MIUI; cài lại đổi uid/reset appops; nhảy giờ trên Xiaomi reset FSI/10020; trả giờ bằng cmd alarm set-time $(( $(date +%s) * 1000 )) + auto_time 1"
+    "Bẫy QC: force-stop xoá alarm + noti (dùng run-as kill -9); am kill không giết được trên MIUI; cài lại đổi uid/reset appops; nhảy giờ trên Xiaomi reset FSI/10020; trả giờ bằng cmd alarm set-time $(( $(date +%s) * 1000 )) + auto_time 1",
+    "Rewake lúc bật màn cần máy có khoá màn hình (isKeyguardLocked); khoá màn None thì không test được",
+    "Test slots_new: app tính user mới theo PackageInfo.firstInstallTime (A047, A049) thì phải gỡ cài lại; pm clear / install -r không đủ"
    ],
-   "notes": "Chính sách: từ Android 14 USE_FULL_SCREEN_INTENT chỉ cấp mặc định cho app gọi điện/báo thức; app khác phải khai báo Play Console (App content → Full-screen intent), user tự bật ở Settings → nhánh không FSI là nhánh chính trên bản Store; luôn gate canUseFullScreenIntent(). Bản cài adb/debug vẫn có quyền (doc A047) → test bằng appops deny. Họ khác (A044/A045: a044, A045, A047, a033) dùng LockScreenNotiWatcher + logic trong NotificationManager, action …SHOW_LOCKSCREEN, kill-switch enable_noti_lockscreen_rewake, bỏ slot khi user đang dùng máy, ân hạn 2h (A045/A047) — app đã theo họ nào thì giữ họ đó. a031 (qibla) có lock screen theo giờ cầu nguyện, gắn FSI không kiểm quyền → phải thêm gate. A028, a036 chưa có tính năng. Quyết định cần chốt: bỏ CATEGORY_ALARM; hành vi khi user đang dùng máy (A013 post heads-up, A045/A047 bỏ lượt). A045 đã xoá LockScreenNotiWatcher (6bb2f45) → không có rewake (thiếu nghiệm thu), kill-switch rewake chỉ có ở A047/a044. Audit đòi tín hiệu ACTION_SCREEN_ON cho rewake."
+   "notes": "Chính sách: từ Android 14 USE_FULL_SCREEN_INTENT chỉ cấp mặc định cho app gọi điện/báo thức; app khác phải khai báo Play Console (App content → Full-screen intent), user tự bật ở Settings → nhánh không FSI là nhánh chính trên bản Store; luôn gate canUseFullScreenIntent(). Bản cài adb/debug vẫn có quyền (doc A047) → test bằng appops deny. Họ khác (A044/A045: a044, A045, A047, a033) dùng LockScreenNotiWatcher + logic trong NotificationManager, action …SHOW_LOCKSCREEN, kill-switch enable_noti_lockscreen_rewake, bỏ slot khi user đang dùng máy, ân hạn 2h (A045/A047) — app đã theo họ nào thì giữ họ đó. a031 (qibla) có lock screen theo giờ cầu nguyện, gắn FSI không kiểm quyền → phải thêm gate. A028, a036 chưa có tính năng. Quyết định cần chốt: bỏ CATEGORY_ALARM; hành vi khi user đang dùng máy (A013 post heads-up, A045/A047 bỏ lượt). A045 đã xoá LockScreenNotiWatcher (6bb2f45) → không có rewake (thiếu nghiệm thu), kill-switch rewake chỉ có ở A047/a044. Audit đòi tín hiệu ACTION_SCREEN_ON cho rewake. A047 thiếu biến thể un_support, không huỷ alarm slot thừa, parseTime chỉ H:mm; A049 đã bổ sung. Họ A045/A047/A049 giới hạn số slot = số loại noti (take(entries.size))."
   },
   {
    "id": "MO-96",
@@ -15367,7 +15493,7 @@
     "Ngắt mạng đúng lúc ad đang load rồi bật lại → vẫn có inter, không nhảy màn.",
     "FO + high-floor (native_full_splash bật) + mất mạng giữa chừng."
    ],
-   "notes": "Regex không phân biệt được cổng load chạy 1 lần (first {}) với chạy lại theo mạng — a033 khớp regex nhưng dính bug; kiểm tay."
+   "notes": "Regex không phân biệt được cổng load chạy 1 lần (first {}) với chạy lại theo mạng — a033 khớp regex nhưng dính bug; kiểm tay. Base project chưa đạt (cổng first, FAIL/TIMEOUT không xét mạng, progress chạy cả offline, trần đếm từ đầu, loadSplashAds guard NONE). A049 AdsManager.loadSplashAds đã bỏ guard NONE (15/10/2026, nạp khi khác SUCCESS/LOADING như A048)."
   },
   {
    "id": "MO-97",
@@ -15496,7 +15622,7 @@
     "Gửi FCM / chờ alarm khi app đã kill → không có billing_finish.",
     "Theo dõi ANR rate trên Play Console."
    ],
-   "notes": "Không tự AppsFlyerLib.init/start trong app (SDK làm). AutoInitEnabled=false nằm ở dòng sau android:name trong manifest — regex dòng không bắt được, kiểm tay."
+   "notes": "Không tự AppsFlyerLib.init/start trong app (SDK làm). AutoInitEnabled=false nằm ở dòng sau android:name trong manifest — regex dòng không bắt được, kiểm tay. A047/A048 singleOf(::AdsManager), base project/A049 single có kiểm main thread: không createdAtStart (lệch nghiệm thu MO-100, chờ MO chốt). SDK di/Modules.kt: RevenueManager + RC createdAtStart → chạy cả trong process dậy nền."
   },
   {
    "id": "MO-98",
@@ -15603,16 +15729,19 @@
        "apps": [
         "a027",
         "a033",
-        "a042"
+        "a042",
+        "a048"
        ],
-       "note": "cùng tên"
+       "note": "cùng tên; a048 default true"
       },
       {
        "key": "language_config.buffer_alt",
        "apps": [
-        "a037"
+        "a037",
+        "a049",
+        "a045"
        ],
-       "note": "default true"
+       "note": "default a037/a049 true, a045 false"
       }
      ]
     },
@@ -15627,14 +15756,17 @@
        "apps": [
         "a027",
         "a033",
-        "a042"
+        "a042",
+        "a048"
        ],
        "note": "cùng tên"
       },
       {
        "key": "language_config.min_ad_interval_alt",
        "apps": [
-        "a037"
+        "a037",
+        "a049",
+        "a045"
        ],
        "note": "default 1000"
       }
@@ -15692,9 +15824,10 @@
    "qc": [
     "Bật buffer → chạm đổi ngôn ngữ → logcat iaa_request/iaa_impression language_alt có ad_request_id khác nhau",
     "Chạm 5 lần trong 1 giây → chỉ đổi 1 lần",
-    "Tắt buffer → vẫn đổi ad sau khi ad hiện đã impression"
+    "Tắt buffer → vẫn đổi ad sau khi ad hiện đã impression",
+    "2 unit log y hệt (loadAd: placement=language_alt, nameSpace=language_alt) → phân biệt bằng ad_request_id; creative test của Google hay trùng"
    ],
-   "notes": "Docs MO: Lark wiki trong catalog. Night-dev a033: AdGroupUnit.loadAd() bỏ qua khi ad đang SUCCESS chưa impression → reset() trước loadAd() nếu cần ép."
+   "notes": "Docs MO: Lark wiki trong catalog. Night-dev a033: AdGroupUnit.loadAd() bỏ qua khi ad đang SUCCESS chưa impression → reset() trước loadAd() nếu cần ép. A048: logic inline ở LanguageAltScreen, nameSpace unit đệm cứng language_alt (A013 bufferUnit() đọc config), onCleared không reset unit đệm (A049 có)."
   },
   {
    "id": "MO-99",
@@ -15964,9 +16097,10 @@
    "recipe": "references/setup.md § MO-100",
    "qc": [
     "Chạy release: UMP → inter splash → log trackIaaRequest / trackIaaLoaded / trackIaaImpression.",
-    "DebugView sdk_init có ump_finish, mobile_ads_finish, remote_config, appsflyer."
+    "DebugView sdk_init có ump_finish, mobile_ads_finish, remote_config, appsflyer.",
+    "Build release, cài, mở lạnh → adb logcat -b crash rỗng"
    ],
-   "notes": "Sau khi tích hợp áp MO-97 + DEV-3. Bẫy: thiếu AdHostActivity (app-open chết), AdsManager không createdAtStart (a037), SharedPrefs cũ khác file packageName (mất data), plugin/AAR lệch version."
+   "notes": "Sau khi tích hợp áp MO-97 + DEV-3. Bẫy: thiếu AdHostActivity (app-open chết), AdsManager không createdAtStart (a037), SharedPrefs cũ khác file packageName (mất data), plugin/AAR lệch version. Release crash R8 WorkManager/Room trên AGP 9 (setup.md Tổng quan). Tên adunit phải theo tiền tố để test ad bản debug đúng loại."
   },
   {
    "id": "DEV-3",
@@ -16103,7 +16237,13 @@
     "language order",
     "language_oder",
     "ngôn ngữ theo ua",
-    "ngon ngu theo ua"
+    "ngon ngu theo ua",
+    "icon tick",
+    "tick ngôn ngữ",
+    "tick ngon ngu",
+    "tick size",
+    "màu tick",
+    "mau tick"
    ],
    "requirement": "List = ngôn ngữ máy + tối đa 6 mã từ RC theo thứ tự UA (bỏ mã không có trong list, mã trùng, mã trùng ngôn ngữ máy) + phần còn lại sort theo MO-34.",
    "acceptance": [
@@ -16168,9 +16308,11 @@
        "key": "language_config.order",
        "apps": [
         "a037",
-        "a042"
+        "a042",
+        "a048",
+        "a049"
        ],
-       "note": "trong RC language_config"
+       "note": "trong RC language_config; a048/a049 nhận mảng JSON hoặc CSV, cắt 10 (PRIORITY_LANGUAGE_LIMIT) trước khi lọc; default a048 en,es,pt,ar; a049 theo doc PO"
       },
       {
        "key": "top_languages",
@@ -16230,7 +16372,9 @@
    "qc": [
     "RC priority_languages=fr,de,ja,ko,it,es,pt,ar → pm clear → mở app 2 lần → sau dòng máy đúng fr,de,ja,ko,it,es",
     "Thêm mã trùng ngôn ngữ máy vào RC → không lặp",
-    "RC rỗng → list như MO-33/34"
+    "RC rỗng → list như MO-33/34",
+    "App gom JSON (A048): order = [] → list trơn",
+    "Thử RC rỗng bằng giá trị rỗng, hoặc xoá parameter rồi pm clear (chỉ xoá parameter thì máy giữ giá trị lần fetch trước; chỉ pm clear thì máy fetch lại giá trị còn trên Firebase)"
    ],
    "notes": "Tín hiệu cắt 6 dò theo hằng MAX_PRIORITY_LANGUAGES hoặc .take(6) trên dòng có chữ priority (recipe dặn đặt tên hằng như vậy). a028 gắn cứng 11 ngôn ngữ (sheet)."
   },
@@ -16674,7 +16818,7 @@
     "Vào/ra nhiều lần; kill app trong cửa sổ cap",
     "RC = 0"
    ],
-   "notes": "Đóng dấu khi impression (no-fill không ăn cap), lưu pref, dùng currentTimeMillis (hiệu < 0 → coi như hết cap). Tên key là đề xuất — cần MO chốt."
+   "notes": "Đóng dấu khi impression (no-fill không ăn cap), lưu pref, dùng currentTimeMillis (hiệu < 0 → coi như hết cap). Tên key là đề xuất — cần MO chốt. Loading lúc SDK nạp app_resume: xem EXT-AD-LOADING (A013 dùng LoadingAdsView). Timeout = namespace của placement app_resume: A013 30000, A047 10000, A048 5000, A049 resume 10000; RC ads_config đè file local."
   },
   {
    "id": "DEV-19",
@@ -16920,6 +17064,141 @@
    "notes": "Cần reloadWhenResume (hoặc reload chủ động) để về Home có ad mới. detect all chỉ nhận placement có chữ home (collab_home, nativecolab_home); collapsible ở màn khác (a031, a044, A014 collab_feature) không tính."
   },
   {
+   "id": "EXT-AD-LOADING",
+   "row": 0,
+   "sheet": "",
+   "group": "ads",
+   "title": "Loading trước ad full-screen (inter in-app, app resume) — ngoài sheet",
+   "status": "active",
+   "flow": "In-app",
+   "sheet_text": {},
+   "owner": null,
+   "needs_dev": null,
+   "needs_qc": null,
+   "est": {
+    "dev_h": null,
+    "qc_h": null,
+    "qc_note": null
+   },
+   "figma": [],
+   "docs": [],
+   "sheet_hint": null,
+   "sheet_notes": "Không có dòng trong sheet MO: ticket A049 P4713 (ref A048) + loading lúc nạp app_resume (ref A047). Không có MO-ID, nhận qua prompt.",
+   "sheet_status": {},
+   "images": [],
+   "old_ids": [],
+   "aliases": [
+    "loading trước inter",
+    "loading truoc inter",
+    "loading trước ad",
+    "loading truoc ad",
+    "loading ads",
+    "loading ad",
+    "màn loading quảng cáo",
+    "man loading quang cao",
+    "dialog loading inter",
+    "loading dialog",
+    "ad loading dialog",
+    "time_show_loading_ads",
+    "OvlAdsLoading",
+    "showInterWithLoading",
+    "loading resume",
+    "showResumeLoading",
+    "loading app resume",
+    "loading khi quay lại app",
+    "loading khi quay lai app"
+   ],
+   "requirement": "Trước mỗi inter trong app (trừ splash) hiện màn loading \"Loading Ad...\" trong time_show_loading_ads rồi mới show ad; không có ad sẵn thì đi tiếp ngay, không hiện loading. Lúc SDK đang nạp app_resume khi user quay lại app cũng hiện loading này, để user không thao tác rồi bị ad bật đè.",
+   "acceptance": [
+    "Có ad sẵn: loading hiện khoảng time_show_loading_ads rồi ad hiện",
+    "Không có ad sẵn: không hiện loading, đi tiếp ngay",
+    "Quay lại app lúc SDK nạp app_resume: loading hiện tới khi ad hiện, nạp hụt hoặc hết timeout",
+    "Loading chặn back và chạm; bắn overlay_show OvlAdsLoading"
+   ],
+   "sdk": {
+    "available": "partial",
+    "api": "BaseAds.showResumeLoading / hideResumeLoading (hook cho app_resume); AdGroupUnit.showFullScreen",
+    "min_version": null,
+    "note": "SDK không có loading trước inter in-app: showFullScreen show ngay. FullscreenAdObserver có slot loading nhưng chỉ hiện khi unit chưa SUCCESS (nạp theo yêu cầu), ngược nghiệm thu 'không có ad thì đi tiếp ngay'."
+   },
+   "canonical": {
+    "app": "a048",
+    "files": [
+     "ads/AdsManager.kt",
+     "ads/AdsLoadingOverlay.kt",
+     "MainActivity.kt"
+    ],
+    "verified_commit": "fcecc4a",
+    "symbols": [
+     "AdsManager.showInterWithLoading",
+     "AdsManager.adLoadingVariant",
+     "AdsManager.isAdCoveringScreen",
+     "AdsLoadingOverlay"
+    ],
+    "note": "Không có chuẩn A013 (mục ngoài sheet). A049 cùng logic: AdsManager.showInterWithLoading, showLoadingDialog, ui/dialog/AdLoadingDialog.kt host ở AppNavigation. A013 chỉ có LoadingAdsView cho app resume (dialog OvlAdsLoading ở ui/base/dialog/AdsLoadingDialog.kt khai mà không màn nào gọi, detect khớp import thừa)."
+   },
+   "rc_keys": [
+    {
+     "key": "time_show_loading_ads",
+     "type": "Long (ms)",
+     "default": "1000",
+     "meaning": "Thời gian hiện loading trước inter in-app",
+     "aliases": [
+      {
+       "key": "time_show_loading_ads",
+       "apps": [
+        "a039",
+        "a048",
+        "a049"
+       ],
+       "note": "cùng tên; a039 default 500, a048/a049 1000"
+      }
+     ]
+    }
+   ],
+   "events": [
+    {
+     "name": "overlay_show",
+     "params": "overlay_name=OvlAdsLoading",
+     "note": "cả loading trước inter lẫn lúc nạp app_resume"
+    }
+   ],
+   "placements": [
+    {
+     "name": "inter_inapp",
+     "format": "interstitial",
+     "aliases": []
+    },
+    {
+     "name": "app_resume",
+     "format": "app_open",
+     "aliases": []
+    }
+   ],
+   "depends_on": [
+    "MO-82"
+   ],
+   "detect": {
+    "any": [
+     "showInterWithLoading",
+     "\"time_show_loading_ads\"",
+     "showResumeLoading\\s*=",
+     "OvlAdsLoading"
+    ],
+    "all": [
+     "showInterWithLoading|\"time_show_loading_ads\"",
+     "showResumeLoading\\s*="
+    ]
+   },
+   "recipe": "references/inapp-ads.md § EXT-AD-LOADING",
+   "qc": [
+    "Trigger inter lúc có ad: loading khoảng time_show_loading_ads rồi mới tới ad; logcat overlay_show OvlAdsLoading",
+    "Trigger lúc chưa có ad: đi tiếp ngay, không loading",
+    "Về nền rồi mở lại: loading hiện trong lúc nạp app_resume, tắt khi ad hiện / nạp hụt / hết timeout"
+   ],
+   "notes": "Loading trước inter in-app tắt ở onNextAction / onAdFailedToShow / onAdClosed, không tắt ở onAdShow; loading lúc nạp app_resume do SDK tắt (hideResumeLoading) khi ad hiện, nạp hụt hoặc hết timeout. Gộp state loading vào cờ đang-có-ad (A048 isAdCoveringScreen, A049 isAdOnScreen) để noti/popup khác không bật lúc loading. A048 inter_after_ob cũng đi qua showInterWithLoading."
+  },
+  {
    "id": "CC-2",
    "row": 2,
    "sheet": "Crawl Competitor",
@@ -16958,7 +17237,14 @@
     "ad not available",
     "đếm reward",
     "dem reward",
-    "cc-2"
+    "cc-2",
+    "reward fail",
+    "reward lỗi",
+    "reward loi",
+    "can't fetch ads",
+    "cannot fetch ads",
+    "cannot_fetch_ads",
+    "reward_fail_continue"
    ],
    "requirement": "User dùng tính năng phải xem đủ N reward ad (RC) mới xử lý; thoát app/thoát tính năng → reset đếm; ad lỗi → toast 'Ad not available right now, pls try again later'. Sheet: chưa làm.",
    "acceptance": [
@@ -16986,6 +17272,13 @@
      "type": "Long",
      "default": "1",
      "meaning": "ĐỀ XUẤT: số reward phải xem để mở tính năng (nhiều tính năng: reward_required_count_<feature>)",
+     "aliases": []
+    },
+    {
+     "key": "reward_fail_continue",
+     "type": "Boolean",
+     "default": "true",
+     "meaning": "A049 (19/10, user chọn tên, chưa app nào khác có): tải reward lỗi → true chạy tính năng, false ở lại + toast cannot_fetch_ads",
      "aliases": []
     }
    ],
@@ -17046,7 +17339,7 @@
     "Mất mạng → toast",
     "Ra nền rồi vào lại → đếm về 0"
    ],
-   "notes": "Ứng viên — MO chốt N và tên key. Policy: reward phải opt-in, nút ghi rõ xem quảng cáo."
+   "notes": "Ứng viên — MO chốt N và tên key. Policy: reward phải opt-in, nút ghi rõ xem quảng cáo. A049 (N=1): reward tắt/đã mua/không consent → chạy luôn; tải lỗi theo RC reward_fail_continue (Q53)."
   },
   {
    "id": "CC-3",

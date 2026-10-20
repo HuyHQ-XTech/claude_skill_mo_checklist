@@ -107,10 +107,16 @@ Nếu PR khác merge trước làm trùng số phiên bản: `git pull --rebase 
 3. **Không secret / ID thật:** ad unit, AdMob app ID, AppsFlyer key, token, file `.figma-token`… CI chặn
    `ca-app-pub-…` thật.
 4. **ID mục = số dòng sheet "Checklist - MO New"**, không tự đổi.
+   - Tactic MO đã làm theo ticket nhưng chưa có dòng trong sheet: thêm mục `EXT-<TÊN>` (chữ hoa, gạch nối; `sheet` = "",
+     `row` = 0), không đặt MO-ID. Bắt buộc có `aliases` đủ cách user hay gọi để `catalog.py find` nhận ra qua prompt, và
+     section `## EXT-<TÊN>` trong file recipe của nhóm.
+   - Khi MO thêm tactic đó vào sheet: người bảo trì đổi ID sang `MO-<dòng>` và giữ `EXT-<TÊN>` trong `old_ids`,
+     gộp dữ liệu sheet vào mục, đổi heading recipe theo (`SKILL.md` § update-catalog bước 3).
    - Thêm mục / đổi số dòng theo sheet mới là việc của người bảo trì (`scripts/sheet_diff.py`), để 2 người
      không cùng đổi ID.
 5. **Khuôn section recipe:** `## MO-xx — <tên>` gồm Yêu cầu · Nghiệm thu · SDK · Chuẩn A013 · Remote config ·
-   Placement/tracking · Cách làm · Bẫy · QC. Viết tiếng Việt; tên code giữ nguyên tiếng Anh.
+   Placement/tracking · Cách làm · Bẫy · QC. Viết tiếng Việt; tên code giữ nguyên tiếng Anh. Mục EXT: heading
+   `## EXT-<TÊN> — <tên>`, phần Chuẩn ghi app ref của ticket (`canonical.app`).
 6. **Tên key RC mới:** theo thứ tự trong `references/conventions.md` §1. Key cũ của app nào thì thêm vào
    `aliases`, đừng đổi tên chuẩn.
 

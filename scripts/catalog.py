@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Tra cứu & bảo trì catalog MO checklist (chỉ dùng stdlib).
 
-  catalog.py find "<yêu cầu tự do | MO-82 | MO checklist 88 + 90 | 82>"
+  catalog.py find "<yêu cầu tự do | MO-82 | MO checklist 88 + 90 | 82 | EXT-AD-LOADING>"
   catalog.py show MO-95 [--json]
   catalog.py list [nhóm] [--status active|candidate|deprecated|blocked-policy]
   catalog.py render                      # sinh CATALOG.md
@@ -60,6 +60,8 @@ MO_ID_RE = re.compile(r"(?<![a-z0-9])(?:checklist\s+)?mo\s*(?:[-_#:]\s*|\s+check
                       re.I)
 CHECKLIST_ID_RE = re.compile(r"(?<![a-z0-9])checklist\s+(" + ID_LIST + r")(?![\d.])", re.I)
 OTHER_ID_RE = re.compile(r"(?<![a-z0-9])(dev|cc)\s*[-_ ]\s*(\d{1,3})(?![\d.])", re.I)
+# Tactic MO không có dòng trong sheet: không có MO-ID, nhận qua prompt; handle EXT-<TÊN> chỉ để show/recipe.
+EXT_ID_RE = re.compile(r"(?<![a-z0-9])ext-([a-z0-9]+(?:-[a-z0-9]+)*)", re.I)
 
 
 def parse_ids(text):
@@ -73,6 +75,8 @@ def parse_ids(text):
                 ids.append(f"MO-{int(n)}")
     for m in OTHER_ID_RE.finditer(raw):
         ids.append(f"{m.group(1).upper()}-{int(m.group(2))}")
+    for m in EXT_ID_RE.finditer(raw):
+        ids.append(f"EXT-{m.group(1).upper()}")
     return list(dict.fromkeys(ids))
 
 
@@ -306,7 +310,8 @@ def cmd_render(cat, _args):
         "",
         f"Sinh tự động từ `catalog.json` bằng `scripts/catalog.py render` — **không sửa tay**. Snapshot sheet "
         f"\"{meta['master_sheet']}\" ngày {meta['snapshot']}. ID = `MO-<số dòng trong sheet>`; `DEV-<dòng>` = "
-        "sheet \"Checklist - Dev\"; `CC-<dòng>` = sheet \"Crawl Competitor\" (ứng viên).",
+        "sheet \"Checklist - Dev\"; `CC-<dòng>` = sheet \"Crawl Competitor\" (ứng viên); `EXT-<TÊN>` = tactic MO đã làm "
+        "theo ticket nhưng chưa có dòng trong sheet (không có MO-ID, nhận qua prompt).",
         "",
         "Trạng thái: `active` = đang áp dụng · `candidate` = MO đang cân nhắc · `deprecated` = đã bỏ · "
         "`blocked-policy` = không làm vì vi phạm chính sách Play.",
@@ -359,6 +364,13 @@ def cmd_check(cat, _args):
                 errors.append(f"{iid}: thiếu {f}")
         if it.get("status") == "active" and not it.get("requirement"):
             warns.append(f"{iid}: chưa có requirement")
+        if iid.upper().startswith("EXT-"):
+            if not re.fullmatch(r"EXT-[A-Z0-9]+(?:-[A-Z0-9]+)*", iid):
+                errors.append(f"{iid}: ID mục ngoài sheet phải dạng EXT-<TÊN> (chữ hoa, gạch nối)")
+            if it.get("sheet") or it.get("row"):
+                errors.append(f"{iid}: mục EXT phải có sheet = \"\" và row = 0")
+            if not it.get("aliases"):
+                errors.append(f"{iid}: mục EXT phải có aliases để `find` nhận ra qua prompt")
         for dep in it.get("depends_on") or []:
             if dep not in ids:
                 errors.append(f"{iid}: depends_on {dep} không tồn tại")

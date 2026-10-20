@@ -17,11 +17,28 @@ Trong các lệnh dưới, `$P` = applicationId của app (lấy từ `detect_st
   đang chạy.
 - **`ads_config` cũng là một key RC.** Sửa placement/unit/layout thì sửa trên Firebase, không phải file
   trong repo. File `app/config/ads_config.json` chỉ là default lúc build (được mã hoá vào assets).
+  - Bản trên Firebase **thay nguyên file**. Thiếu placement, thiếu nameSpace, hoặc nameSpace không có adunit thì
+    `AdGroupUnit.enable` = false: vị trí đó không có ad mà không báo lỗi. Mục MO thêm placement phải báo MO thêm
+    cả nameSpace + placement vào bản Firebase (vd A049 `native_popup_lang`).
+- **Kiểu giá trị RC quyết định app đọc được hay không.** SDK (xtechcore `RemoteConfigManager`) lưu mỗi key theo kiểu
+  đoán được: số nguyên → Long, số thập phân → Float, true/false → Boolean, còn lại → String.
+  - Key app khai Long mà trên Firebase nhập `1.5` → lưu Float → `SharedPreferenceProperty` gặp lỗi kiểu, trả default
+    mà không báo.
+  - Parameter JSON (`language_config`, `noti_config`…) bị nhập thành số hoặc `true` → không còn là String → `RcGroup`
+    (A048/A049) cho cả nhóm về default, chỉ log 1 lần.
+  - QC thấy "đổi RC không ăn" thì kiểm kiểu giá trị trên Firebase trước.
 
 ## 2. Ads
 
 - Build test/debug thường tự dùng ID test của Google. Kiểm placement bằng logcat:
   `adb logcat | grep -iE "iaa_|ad_impression|placement"`.
+- Trước bản release, đối chiếu ID trong `ads_config` với sheet "Ad script" (cột `code`), cả file trong repo lẫn bản
+  trên Firebase (bản máy đã tải: `run-as <pkg> cat files/frc_*_firebase_activate.json`, khoá `ads_config`):
+  - nameSpace đang bật mà còn ID test của Google (A049 16/10: `inter_replace_reward` thêm sau, lúc đó sheet chưa có
+    cột `code`);
+  - 2 unit khác nhau trùng 1 ID (A049: `native_popup_confirm` chép nhầm ID của `native_survey1_high`);
+  - nameSpace đang tắt (banner) được giữ ID test tới khi MO có ID. Placement đã nối trong code thì đừng xoá chỉ vì
+    đang tắt: MO bật lại bằng RC sẽ không còn unit để nạp.
 - Click ad rồi quay lại app: kiểm toast/noti sau click (MO-79/MO-70) và hành động "next screen" ở màn FO
   (MO-93).
 - Mỗi lần reload native phải ra impression mới. Thấy native "giữ nguyên" thì soát `reset()` trước
