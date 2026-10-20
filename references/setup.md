@@ -1,6 +1,7 @@
 # Setup — SDK, consent, Firebase, revenue (MO-5..MO-20, MO-100)
 
 > Recipe đối chiếu lần cuối với A013 commit `f784827` (branch v1.2.7, xtechads 1.8.2) và source xTechSDK (nhánh `fix_native`, có thể mới hơn 1.8.2). Skill **không chép code**: mọi chi tiết code đọc từ A013 bản hiện tại theo file + symbol nêu dưới.
+> Ghi chú Ref A047/A048, "App đã làm: A049" và các đoạn ghi "10/2026" đối chiếu ngày 15/10/2026: A47 `61711d3` (xtechads 1.7.5), A048 `fcecc4a` (1.7.6), A049 `78a9c9b` + thay đổi chưa commit (1.8.7), source xTechSDK nhánh `main` (1.8.5 + "support a049") và AAR 1.8.7.
 > Mã app theo `apps.json`: a27 = a027, A47 = a047, Langofy = a042, qibla = a031, Duo-Speak = a041, PDF Reader = a033, A014/A028/A045 = a014/a028/a045.
 > Quy ước đường dẫn: file Kotlin A013 tính từ `app/src/main/java/com/example/a013_recovery/`; manifest/res/gradle/config tính từ gốc repo. App khác: tính từ package gốc của app (tìm theo tên file + symbol, thư mục repo ở `apps.json`).
 
@@ -9,8 +10,8 @@
 **Trình tự khởi động chuẩn (app dùng xtechads):**
 1. `Application.onCreate` → `startKoin` nạp module SDK (`com.example.xtechads.di.repositoryModule`, `adsModule`) **trước** module app. Lúc này các singleton eager chạy: `AdsManager` của app (kế thừa `BaseAds`, `createdAtStart`) → `LicenseGuard.verify` (crash `Unauthorize` nếu applicationId chưa whitelist) + chốt tham số RC; `RevenueManager` (SDK, eager) → `AppsflyerManager` init/start AppsFlyer trên IO nếu `AppConfig.appsflyerKey` khác rỗng; `RemoteConfigManager` (module `xtechcore`, eager ở source mới) → fetch RC trên IO, cache-first.
 2. `MainActivity` (implement `AdHostActivity`) `onCreate` → `requestUMP(activity, enableDebug = BuildConfig.DEBUG, resetData = false)`.
-3. UMP kết thúc ở **mọi nhánh** (đồng ý, không cần, lỗi) → SDK `initMobileAds()` (private): `consentFinished = true` rồi `MobileAds.initialize` trên IO → `mobileAdsFinish = true`; bắn `tracking_consent` + `sdk_init` (`ump_finish`, `mobile_ads_finish`).
-4. Mọi `AdGroupUnit.loadAd` bị chặn bởi `canLoadAd` (= `canShowAds` và có mạng; `canShowAds` = `umpAllowed` và chưa mua `isPurchase`) → gọi load trước consent hoặc khi offline = status `FAIL` ngay.
+3. UMP kết thúc ở **mọi nhánh** (đồng ý, không cần, lỗi) → SDK `initMobileAds()` (private): `consentFinished = true` rồi `MobileAds.initialize` trên IO → `mobileAdsFinish = true`; bắn `tracking_consent` + `sdk_init` (`ump_finish`, `mobile_ads_finish`). User cũ đã có consent (`canRequestAds()`) → init ngay lúc gọi `requestUMP`, không chờ request info; form (nếu cần hỏi lại) vẫn hiện sau đó và đóng form không bắn gì thêm (MO-22, MO-25).
+4. Mọi `AdGroupUnit.loadAd` bị chặn bởi `canLoadAd` (= `canShowAds` và có mạng; `canShowAds` = `umpAllowed` và chưa mua `isPurchase`; `umpAllowed` = `canRequestAds()` hoặc `privacyOptionsRequirementStatus` khác REQUIRED) → gọi load khi offline, hoặc khi UMP đã biết cần consent mà chưa có = status `FAIL` ngay. Lúc `requestConsentInfoUpdate` chưa trả về hoặc lỗi (status UNKNOWN) thì `umpAllowed` = true → request **vẫn đi** dù chưa consent (MO-9, MO-22).
 5. Doanh thu IAA: mỗi `OnPaidEvent` trong ad unit SDK → `RevenueManager.logAdRevenue` fan-out 3 đích: AppsFlyer (`logAdRevenue`), Firebase `in_app_ad_impression`, Facebook `AdImpression`. Doanh thu IAP: SDK **không** làm, app tự log.
 
 **Các mục liên quan nhau:** danh tính app MO-6 (package) · MO-7 (AdMob App ID) · MO-11 (Facebook ID); consent MO-8 · MO-9 · MO-10 (luồng splash ở MO-22/MO-24); SDK quảng cáo/attribution MO-12 · MO-13 · MO-14 · MO-15 · MO-18 · MO-5 (billing); Firebase MO-16 · MO-17 (cổng chờ RC ở splash: MO-27); build/layout MO-19 · MO-20. MO-100 là checklist tích hợp SDK tổng. Init song song / tối ưu init: DEV-3 và MO-97 nằm ở `splash.md`.
@@ -20,6 +21,21 @@
 **App không dùng xtechads:** A028, a036 (`ads/base/BaseAds.kt` + `ads/base/ConsentHelper.kt`, `ads/remoteconfig/RemoteConfigManager.kt`, `ads/adjust/AdjustManager.kt`, RevenueCat `ads/payment/PaymentManager.kt`); a041 Duo-Speak (module `core/ads`: `ConsentHelper`, `remoteconfig/RemoteConfigManager`, `appsflyer/AppsflyerManager` + `RevenueManager`). Luồng giống hệt (requestUMP → initMobileAds → `consentFinished`/`initFinished`), chỉ khác tên/vị trí — ghi chú riêng ở từng mục.
 
 **Mốc phiên bản SDK cần nhớ:** gỡ Adjust khỏi xtechads 2026-08-17 (`AppConfig.adjustKey` bị xoá hẳn); tách `xtechcore` (RC + prefs) 2026-09-15; RC bật lại `createdAtStart` 2026-09-28 (bản cũ RC lazy → app phải tự resolve/fetch); billing lazy + `isPurchasedCached` 2026-09-08. a016 còn ở xtechads 1.4.6 (vẫn có `adjustKey`).
+
+**Key RC SDK khai mà không tự dùng** (đối chiếu source xTechSDK, 10/2026): `AdsSharedPref` khai `star_review_to_store`,
+`interval_skip_inter`, `screen_skip_inter`, `is_show_native_fs_resume`, `show_continue_native_fs_countdown`,
+`auto_continue_native_fs_durations`, nhưng ngoài `AdsSharedPref` không chỗ nào trong SDK đọc chúng. Đó chỉ là chỗ đọc chung:
+hành vi (gate interval, ngưỡng sao → Store, native full resume…) do app tự làm. Key SDK tự dùng: `ads_config`
+(`AdsConfigProvider`), `af_ad_revenue_threshold` (`AfImpressionThresholdTracker`), `af_ad_revenue_threshold_events`
+(`AfRevenueThresholdTracker`).
+Kiểm nhanh: grep tên getter trong `xTechSDK/xtechads/src/main`.
+
+**Bẫy build/setup chung (đối chiếu 10/2026, xtechads 1.8.7, AGP 9):**
+- **Release crash ngay lúc process start**, cả khi job/FCM đánh thức app ở nền; debug không thấy vì không chạy R8. Log: `androidx.startup.InitializationProvider` không tạo được `androidx.work.impl.WorkDatabase` (`InstantiationException`).
+  - Gốc: xtechads → `play-services-ads` 25.4.0 → `work-runtime` 2.7.0 → `room-runtime` 2.2.5. Consumer rule của 2 bản cũ này giữ class (lớp con `RoomDatabase`, lớp con `InputMerger`) nhưng không giữ constructor rỗng; AGP 9 bật mặc định `android.r8.strictFullModeForKeepRules` nên R8 thôi ngầm giữ constructor. Thiếu constructor `InputMerger` thì mọi `OneTimeWorkRequest` lỗi "Could not create Input Merger" (gồm ping offline của GMA).
+  - Cách các app đã sửa: khai `work-runtime` 2.11.2 để kéo Room 2.7.0 có rule mới (A47; A048 kèm rule `RoomDatabase`); app có Room tự khai Room ≥ 2.7 (A045 2.8.4, kèm rule `InputMerger` vì work-runtime vẫn 2.7.0); hoặc rule giữ constructor rỗng trong `app/proguard-rules.pro` — mọi lớp con `RoomDatabase` + `InputMerger` (A013), hẹp hơn chỉ `WorkDatabase_Impl` + `InputMerger` (A049). Không tắt `strictFullModeForKeepRules` cho cả app chỉ để cứu vài class.
+  - QC: build release, cài, mở lạnh → `adb logcat -b crash` rỗng; `app/build/outputs/mapping/release/usage.txt` không còn `<init>()` của `WorkDatabase_Impl`.
+- **Tên adunit quyết định test ad ở bản debug:** `useTestAdId` mặc định = app debuggable → SDK thay unit id bằng test id của Google, đoán loại theo tiền tố `name` của adunit trong `ads_config`: `inter` → interstitial; `open_` / `app_open` / `app_resume` → app open; `reward` → rewarded; `banner` → banner; còn lại → native. Unit inter / app-open đặt tên không theo tiền tố (vd `splash_high`, `resume`) → bản debug nạp test id native → luôn fail như no fill. Đặt `inter_splash*`, `open_resume*` (A47, A048, A049). A013 tắt chế độ này (`useTestAdId = false`, MO-7) nên không gặp.
 
 ## MO-5 — Billing (RevenueCat / xtechbilling)
 
@@ -59,8 +75,8 @@
 - **Chuẩn A013:** `app/src/main/AndroidManifest.xml` meta-data `com.google.android.gms.ads.APPLICATION_ID` (giá trị literal) + flag `com.google.android.gms.ads.flag.OPTIMIZE_INITIALIZATION` / `OPTIMIZE_AD_LOADING` = true, `NATIVE_AD_DEBUGGER_ENABLED` = false. Biến thể: base project trỏ `@string/admob_app_id` (`res/values/sdk_ids.xml`); a016 dùng placeholder `${ADMOB_APP_ID}`, Langofy `${admob_app_id}`.
 - **Cách làm:** khai meta-data (nên qua string resource để thay 1 chỗ), App ID do MO cấp; giữ các flag optimize như A013.
   - Đọc `app/src/main/AndroidManifest.xml` ở A013 (bản hiện tại) để lấy chi tiết (App ID thay bằng ID của app).
-- **Bẫy:** thiếu meta-data → GMA crash lúc init; App ID của app khác → no fill. A013 override `useTestAdId = false` → bản debug cũng chạy unit thật: chỉ test/click trên máy có hash trong `AppConfig.listDeviceTest`.
-- **QC:** logcat không có lỗi thiếu application ID; mở 1 placement thấy ad (test ad trên máy test).
+- **Bẫy:** thiếu meta-data → GMA crash lúc init; App ID của app khác → no fill. A013 override `useTestAdId = false` → bản debug cũng chạy unit thật: chỉ test/click trên máy có hash trong `AppConfig.listDeviceTest`. Thay App ID mẫu của Google bằng App ID thật mà AdMob chưa publish GDPR message cho app → UMP lỗi `Publisher misconfiguration … no form(s) configured for the input app ID`; SDK vẫn `initMobileAds` (nhánh lỗi của `requestUMP`) nên ad vẫn tải nhưng user EEA không thấy form consent. App ID mẫu có form sẵn nên lỗi chỉ lộ sau khi thay (A049 15/10) — báo MO tạo message ở AdMob → Privacy & messaging, không sửa code.
+- **QC:** logcat không có lỗi thiếu application ID; mở 1 placement thấy ad (test ad trên máy test); sau khi thay App ID thật, logcat không có `requestUMP: requestConsentError` (debug đang giả lập EEA nên lỗi hiện cả ngoài EEA). Có lỗi "no form(s) configured" thì nhờ MO publish message GDPR trên AdMob (Privacy & messaging → European regulations); publish xong form hiện lại mà không cần build lại (A049 16/10: 17:37 còn lỗi, 17:48 đã `requestUMP: loadConsentForm` → `finish`).
 
 ## MO-8 — UMP hiện được ở bản debug
 
@@ -71,19 +87,21 @@
 - **Cách làm:** truyền `enableDebug = BuildConfig.DEBUG`; lấy hash máy QC từ logcat UMP lần chạy đầu (dòng gợi ý `addTestDeviceHashedId`) thêm vào `listDeviceTest`; muốn form hiện lại trên máy đã consent: clear data, hoặc tạm `resetData = true` ở debug.
   - Đọc `MainActivity.kt` (`onCreate`) và `di/Modules.kt` (`adsModule`) ở A013 (bản hiện tại) để lấy chi tiết.
 - **Bẫy:** hardcode `enableDebug = false` (A028 `main/MainActivity.kt`) → QC ngoài EEA không bao giờ thấy form; hardcode `true` (ảnh mẫu `assets/refs/MO-8-1.jpg`; a044 `MainActivity` đang vậy) → bản release vẫn gửi debug settings — đừng làm theo ảnh. a033, a036, a041, A045 chưa khai `listDeviceTest` → chỉ test được form trên emulator. Form chỉ hiện khi AdMob đã publish GDPR message cho app (Privacy & messaging) — không hiện thì kiểm AdMob trước khi sửa code.
+- **Bẫy tên app trong form:** dòng "<tên> asks for your consent…" lấy tên app khai trên AdMob (Privacy & messaging),
+  không lấy `app_name`. Đổi tên app thì MO sửa trên AdMob (A049 16/10: `app_name` đã là Hastgy, form vẫn "Palm AI").
 - **QC:** cài debug trên máy test, clear data, mở app → form "… asks for your consent" (ảnh `assets/refs/MO-22-1.jpg`); chọn Consent → app chạy tiếp; logcat `requestUMP: loadConsentForm` → `requestUMP: finish`.
 
 ## MO-9 — UMP chạy trước khi load bất kỳ ad nào
 
 - **Yêu cầu:** Không có ad request nào (splash, native, app-open, preload) trước khi luồng consent kết thúc; form (nếu cần) hiện trước mọi ad.
 - **Nghiệm thu:** logcat theo thứ tự `requestUMP:` → (`requestUMP: finish` / `not required` / lỗi) → `initMobileAds:` → mới có `loadAd:`; trên DebugView không có `iaa_request` nào trước `tracking_consent`.
-- **SDK:** `AdUnit.canLoadAd` (`canShowAds` và có mạng), `consentFinished` (StateFlow, chỉ true sau UMP), `AdGroupUnit.loadAd` gọi sớm → status `FAIL` ngay.
+- **SDK:** `AdUnit.canLoadAd` (`canShowAds` và có mạng), `consentFinished` (StateFlow, chỉ true sau UMP), `AdGroupUnit.loadAd` gọi sớm → `FAIL` ngay chỉ khi offline hoặc UMP đã biết cần consent; lúc UMP chưa trả trạng thái thì request vẫn đi (Tổng quan mục 4).
 - **Chuẩn A013:** `ui/screen/splash/SplashScreen.kt` — khối `combine` theo `consentFinished` + `isConnected` mới gọi `AdsManager.loadSplashAds`; native `bottom_splash` chỉ render khi `SplashContent` nhận `isConsent = true`.
 - **Cách làm:** mọi load/preload trong FO đặt sau `consentFinished`; app-open resume đã bị chặn trên Splash (`AdsManager.screenSkipAdResume` + `disableAdResumeOnTime`). App không SDK: gate theo `consentFinished` của `BaseAds` app.
   - Đọc `ui/screen/splash/SplashScreen.kt` (khối `combine` theo `consentFinished` + `isConnected`) ở A013 (bản hiện tại); phần chờ mạng trước `requestUMP` đọc a045 `MainActivity.initConsent`.
 - **Bẫy:**
   - Gọi `requestUMP` khi offline: request lỗi → SDK vẫn init ads, `umpAllowed` = true vì `privacyOptionsRequirementStatus` chưa biết → có mạng lại là load ad mà user EEA mới chưa từng thấy form. Chuẩn đề xuất: chờ `isConnected` rồi mới `requestUMP` (A045 `MainActivity.initConsent`, a033 `first_open/ui/splash/SplashScreen.kt`, base project). **A013 gọi ngay trong `onCreate` — lệch.**
-  - Preload ad ở `Application`/trước consent → `FAIL` ngay, có thể bị hiểu nhầm là no-fill làm splash đi tiếp sớm.
+  - Preload ad ở `Application`/trước consent → hoặc `FAIL` ngay (bị hiểu nhầm là no-fill, splash đi tiếp sớm), hoặc — lúc UMP chưa trả trạng thái — request thật đi trước form.
   - User từ chối: `canRequestAds()` vẫn true (đã có quyết định) → ad vẫn request (limited/no fill) — xử lý ở MO-23.
 - **QC:** debug EEA, clear data: khi form còn hiện không có dòng `loadAd:` nào; bật máy bay → mở app → tắt máy bay: form phải hiện trước ad (khi đã áp chờ mạng).
 
@@ -95,6 +113,7 @@
 - **Chuẩn A013:** không có lời gọi `MobileAds.initialize` trong app; chỉ `requestUMP` ở `MainActivity.onCreate`.
 - **Cách làm:** xoá mọi `MobileAds.initialize` tự gọi; cần init khi app đang chết mà phải preload (vd lúc bắn noti) thì gọi `ensureAdsInitialized()` (A045 `AdsManager.preloadInterSplashOnNoti`). App không SDK: `initMobileAds` của `ads/base/BaseAds.kt` chỉ gọi trong callback UMP (A028).
   - Đọc `MainActivity.kt` (`onCreate`) ở A013 (bản hiện tại) để lấy chi tiết.
+- **Bẫy:** `ensureAdsInitialized()` chạy trong process mới (vd preload lúc bắn noti) mà UMP chưa trả trạng thái (user EEA chưa consent bao giờ): `umpAllowed` = true nên SDK init ads, bật `consentFinished` và request đi trước form consent. Chỉ gọi khi user đã có consent từ phiên trước (`canRequestAds()`), hoặc chờ `requestUMP` (MO-22, MO-9).
 - **Bẫy:** a032 (sheet) init trong `init` của BaseAds. A028/a036 `requestUMP` bỏ hẳn `requestConsentInfoUpdate` khi `canRequestAds()` → consent hết hạn/đổi vendor list không bao giờ hỏi lại (SDK luôn gọi update, chỉ init sớm song song).
 - **QC:** logcat như ảnh `assets/refs/MO-10-1.jpg`: `requestUMP:` → `requestUMP: loadAndShowConsentFormIfRequired`/`finish` → `initMobileAds:` → `Adapter name: …`.
 
@@ -140,8 +159,8 @@
 - **Chuẩn A013:** không Adjust; AppsFlyer qua `di/Modules.kt` `AppConfig.appsflyerKey`. Ref Adjust (app không SDK): A028/a036 `ads/adjust/AdjustManager.kt` `logAdRevenue` (tạo `AdjustAdRevenue` nguồn `admob_sdk`, set revenue + network mediation rồi `Adjust.trackAdRevenue`), gọi từ `OnPaidEventListener` của từng ad unit app.
 - **Cách làm:** app SDK muốn giữ Adjust: tự khai `com.adjust.sdk:adjust-android` + tự `Adjust.initSdk` (foreground) — nhưng xtechads không public hook paid-event nên **không forward được ad revenue sang Adjust nếu SDK không sửa** → báo SDK team. App không SDK: giữ `AdjustManager`.
   - Đọc `di/Modules.kt` (`AppConfig`) ở A013 (bản hiện tại); nhánh Adjust đọc a028 `ads/adjust/AdjustManager.kt` (`logAdRevenue`).
-- **Bẫy:** nâng xtechads qua mốc 2026-08-17 khi còn truyền `adjustKey` → fail compile; app lấy `com.adjust.sdk` transitive qua SDK sẽ mất class.
-- **QC:** build release xem 1 ad → AppsFlyer live events có ad revenue; (Adjust) Adjust testing console có ad_revenue.
+- **Bẫy:** nâng xtechads qua mốc 2026-08-17 khi còn truyền `adjustKey` → fail compile; app lấy `com.adjust.sdk` transitive qua SDK sẽ mất class. Dev key AppsFlyer là key cấp tài khoản: A013, A014, A045, A047, A048, A054, a037, a039, a044 dùng chung một key → app mới lấy theo app ref (không chép key vào skill). Key rỗng thì SDK không tạo `AppsflyerManager`, không lỗi gì. App chưa được thêm vào tài khoản AppsFlyer → `start` trả `onError: 50 - Status code failure 404`, `sdk_init` `appsflyer` = FAILED, AppsFlyer không nhận gì (A049 15/10) — báo MO/UA thêm app, không sửa code.
+- **QC:** mở app, logcat `sdk_init` có `sdk_key=appsflyer` `status=SUCCESS` (FAILED kèm `Status code failure 404` = app chưa có trên AppsFlyer); build release xem 1 ad → AppsFlyer live events có ad revenue; (Adjust) Adjust testing console có ad_revenue.
 
 ## MO-15 — Adjust: track IAP revenue (nếu có)
 
@@ -161,7 +180,7 @@
 - **Chuẩn A013:** `app/build.gradle.kts` plugin `googleServices`, `firebaseCrashlitycs`, `firebase.perf`; `App.kt` `initFCM` (sau `consentFinished`: Crashlytics + Analytics collection chỉ bật ở release, lấy FCM token → `AppsFlyerLib.updateServerUninstallToken`); `ads/firebase/FirebaseFCM.kt` `onNewToken` (AppsFlyer uninstall token + event `fcm_token` chia chunk 90 ký tự); manifest service `.ads.firebase.FirebaseFCM` + meta `com.google.firebase.messaging.default_notification_icon/color`.
 - **Cách làm:** thêm `google-services.json` + 2 plugin; khai service FCM (của SDK hoặc tự viết như A013); tắt Crashlytics ở debug. Nội dung push/FCM xem MO-75 (nhóm noti).
   - Đọc `App.kt` (`initFCM`), `ads/firebase/FirebaseFCM.kt`, `app/build.gradle.kts` ở A013 (bản hiện tại) — riêng phần set consent làm theo MO-22.
-- **Bẫy:** A013 `initFCM` set consent Analytics GRANTED cho mọi user — **bug**, xem MO-22. `FirebaseAnalyticsUtil.logEventAdsImpression` (`app_ad_impression`) ở A013 là code chết; revenue Firebase thật đi qua SDK `in_app_ad_impression`. Thiếu plugin Crashlytics → không upload mapping, stacktrace release bị obfuscate.
+- **Bẫy:** A013 `initFCM` set consent Analytics GRANTED cho mọi user — **bug**, xem MO-22. `FirebaseAnalyticsUtil.logEventAdsImpression` (`app_ad_impression`) ở A013 là code chết; revenue Firebase thật đi qua SDK `in_app_ad_impression`. Thiếu plugin Crashlytics → không upload mapping, stacktrace release bị obfuscate. Tắt plugin `com.google.gms.google-services` lúc chưa có file Firebase thật → crash `Default FirebaseApp is not initialized` ngay màn đầu (SDK `logScreenShow` gọi `Firebase.analytics` không bọc); giữ plugin với `google-services.json` placeholder đúng package tới khi MO cấp file thật (A049).
 - **QC:** build release → crash thử hiện trên Crashlytics; Firebase console gửi test message tới token (log `fcm_token`); đổi 1 key RC → lần mở sau thấy giá trị mới.
 
 ## MO-17 — Remote Config có hiệu lực trước khi load ad
@@ -188,7 +207,7 @@
 - **Chuẩn A013:** IAA nhờ SDK; `MainActivity.onCreate` tăng `prefs.sessionNumber` (chỉ khi mở mới) và gán `TrackingState.sessionNumber`; helper IAP `utils/Tracking.kt` `trackingIapDataBucketEvent` có sẵn nhưng chưa dùng (không IAP). Ref IAP: a016 `ads/adunit/common/Tracking.kt` `trackingIAPDataInHouseEvent` + `ui/screen/iap/WeeklyTrialScreen.kt`; a27 `ui/screen/payment/SubscriptionScreen.kt`.
 - **Cách làm:** session number ở Activity LAUNCHER; IAP: 1 hàm tracking dùng `TrackingEvent.logEvent` + `bundleOfNotNull`, gọi đúng 8 điểm (hiện paywall, bấm gói, đóng, mua OK, lỗi, huỷ, restore OK/fail) + Firebase `purchase` (value/currency/transaction_id) khi mua mới.
   - Đọc `MainActivity.kt` (`onCreate`, phần `sessionNumber`) ở A013 (bản hiện tại); phần IAP đọc a016 `ads/adunit/common/Tracking.kt` + `ui/screen/iap/WeeklyTrialScreen.kt`.
-- **Bẫy:** sheet: chưa app nào đạt (mọi app = 0) → cần MO chốt danh sách event/param trước khi audit. Tên lệch giữa app: SDK `in_app_ad_impression` vs `app_ad_impression` (a036, a034 util cũ, a041); a016 bắn thêm `inapp_purchase_custom` ngoài `purchase`.
+- **Bẫy:** sheet: chưa app nào đạt (mọi app = 0) → cần MO chốt danh sách event/param trước khi audit. Tên lệch giữa app: SDK `in_app_ad_impression` vs `app_ad_impression` (a036, a034 util cũ, a041); a016 bắn thêm `inapp_purchase_custom` ngoài `purchase`. `sessionNumber` tăng ở mọi `onCreate` (A048 `MainActivity`) → Activity dựng lại (đổi dark mode, ngôn ngữ) cũng thành phiên mới; chỉ tăng khi `savedInstanceState == null` (A013, A47, A049). Event bắn trong process dậy nền (alarm, overlay lock screen) mang `session_number` 0 vì `TrackingState.sessionNumber` mặc định 0 và chỉ được gán ở `MainActivity.onCreate` → gán lại từ prefs ở điểm vào nền (A049 `LockScreenActivity`, `NotificationManager`).
 - **QC:** `adb shell setprop debug.firebase.analytics.app <package>` → DebugView: mở 1 placement (đủ `iaa_*`), mở paywall → mua/huỷ (đủ `iap_*`).
 
 ## MO-19 — MultiDex
@@ -224,5 +243,6 @@
 - **Chuẩn A013:** `App.kt` (thứ tự module trong `startKoin`), `di/Modules.kt`, `MainActivity.kt`, `gradle/libs.versions.toml` (`xtechadsVersion` dùng cho cả lib và plugin), `app/build.gradle.kts`, `app/config/ads_config.json`.
 - **Cách làm:** theo Bước 0–3 + Case A/B của guide; sau đó áp MO-97 (init ở foreground, Facebook AutoInit) và DEV-3.
   - Đọc `App.kt`, `di/Modules.kt`, `MainActivity.kt`, `gradle/libs.versions.toml`, `app/build.gradle.kts` ở A013 (bản hiện tại) để lấy chi tiết.
-- **Bẫy:** thiếu `AdHostActivity` → app-open resume không chạy; `AdsManager` không `createdAtStart` (a037 `singleOf(::AdsManager)`) → lifecycle callback gắn muộn; `SharedPrefs` cũ khác file prefs (`packageName`) → mất data user khi migrate; plugin và AAR lệch version (A034 từng 1.2.1 vs 1.3.4).
-- **QC:** chạy release: UMP → inter splash → log `trackIaaRequest` / `trackIaaLoaded` / `trackIaaImpression`; DebugView `sdk_init` có `ump_finish`, `mobile_ads_finish`, `remote_config`, `appsflyer`.
+  - Ref A047/A048 khác A013: `AdsManager` không `createdAtStart` (A47, A048 `singleOf(::AdsManager)`; base project và A049 khai `single` có kiểm main thread) — lệch dòng Koin của nghiệm thu, xem MO-97.
+- **Bẫy:** thiếu `AdHostActivity` → app-open resume không chạy; `AdsManager` không `createdAtStart` (a037 `singleOf(::AdsManager)`) → lifecycle callback gắn muộn; `SharedPrefs` cũ khác file prefs (`packageName`) → mất data user khi migrate; plugin và AAR lệch version (A034 từng 1.2.1 vs 1.3.4); không ai gọi `requestUMP` (vd tạm bỏ lúc dựng app rồi quên bật lại) → `consentFinished` không bao giờ bật: splash không load ad, không hỏi noti, đứng mãi (hoặc tới trần tổng nếu có) — dấu hiệu: logcat không có dòng `requestUMP:`. Build release crash lúc mở / test ad debug luôn fail: xem Tổng quan nhóm.
+- **QC:** chạy release: UMP → inter splash → log `trackIaaRequest` / `trackIaaLoaded` / `trackIaaImpression`; DebugView `sdk_init` có `ump_finish`, `mobile_ads_finish`, `remote_config`, `appsflyer`; build release cài lên máy, mở lạnh → `adb logcat -b crash` rỗng.

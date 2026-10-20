@@ -71,12 +71,15 @@
   - Screen: `ScrUninstall`.
   - `button_click` với `button_name` là `BtnBack` / `BtnHome` / `BtnKeepUsingApp` / `BtnUninstallApp` / `BtnTryNow`, kèm param `uninstall_feature`.
   - `app_open_from` = `shortcut_uninstall`. Alias: A045 `open_from_shortcut`, A47 `open_from_launcher_uninstall_shortcut`.
+  - Shortcut tính năng: A013 `trackAppOpenFrom` map `shortcut_<tính năng>` (vd `shortcut_enhance`); A048, A049 log chung `shortcut`.
   - Inter splash riêng cho lượt mở từ uninstall: a044 `splash_r3` / `interSplashUninstall`, a039 `interOSplash`. Xem MO-99.
 - **Cách làm**:
   1. **ShortcutManager**:
      - List gồm [tính năng chính, Uninstall].
      - Dựng Intent bằng `BaseShortcutManager.openIntent`, hoặc tự dựng đúng action và flags.
      - Gọi `updateShortcuts()` ở Splash, chạy nền, mỗi lần mở app, để label đi theo ngôn ngữ.
+     - Gọi lại ngay sau khi user đổi ngôn ngữ trong app (A013 `LanguageManager.updateLanguage`; A048, A049 cũng vậy). Đổi ở Setting không đi lại Splash, thiếu chỗ này thì nhãn giữ ngôn ngữ cũ tới lần mở sau.
+     - Launcher chỉ hiện 4 shortcut: giữ tổng ≤ 4, hoặc cho Uninstall nằm trong 4 rank thấp nhất (xem Bẫy, Q48).
      - Đọc `domain/shortcuts/ShortcutManager.kt` ở A013 (bản hiện tại) và `BaseShortcutManager` ở SDK.
   2. **MainActivity**:
      - Chỉ khi `savedInstanceState == null` mới đọc extras vào `prefs.openTo` và log `app_open_from`.
@@ -96,6 +99,16 @@
      - App XML/Fragment: a031 `fragments/uninstall/UninstallFragment.kt`.
      - App non-SDK: A028, a036, a041.
      - Giữ nguyên Intent và flags. Đích là Activity chạy Splash (a041 là `FirstOpenActivity`, a036 dùng `PendingStart.Uninstall`).
+  - **Ref A047/A048 khác A013** (đọc code bản hiện tại):
+    - Try KHÔNG show inter: A048 `UninstallViewModel.backToMain(feature.tab)`, A047 `UninstallViewModel.onTry…` điều hướng thẳng. Nghiệm thu MO-74 vẫn ghi có inter: theo ref thì ghi vào bảng khác biệt và hỏi user (A049, 10/2026: theo A048, bỏ inter).
+    - Try đi về đâu:
+      - A047: điều hướng thẳng tới tính năng, bỏ `ScrUninstall` khỏi stack.
+      - A048: về `ScrMain` đúng tab của tính năng.
+      - A049: về Home, Home mở tính năng qua `openTo` như lượt mở từ noti (`HomeViewModel.openPendingFeature`).
+    - Reset `openTo` ngay ở Splash, trước khi điều hướng: A048 `SplashViewModel.nextScreen` (mọi đích), A047 và A049 (nhánh Uninstall). A013 reset trong `UninstallScreen`, 1s sau resume.
+    - Không có RC `new_uninstall_enable`, chỉ 1 UI.
+    - Shortcut (`common/utils/ShortcutsUtil.kt`): A047 chỉ có Uninstall. A048 tính năng chính (rank 0) rồi Uninstall (rank 1). A049 3 tính năng rồi Uninstall cuối.
+    - Tên click: A048, A049 `BtnTryNow<Feature>` lấy từ `UninstallFeature.clickName` (không dùng param `uninstall_feature`), nút giữ chân `BtnKeepUsing`. A047 `BtnUninstallTry` / `BtnUninstallCard` / `BtnUninstallKeep` / `BtnUninstallConfirm` / `BtnUninstallHome`.
 - **Bẫy**:
   - **POLICY**: shortcut đã tên "Uninstall" thì màn này PHẢI có đường gỡ thật.
     - Cách 1: App info qua `ACTION_APPLICATION_DETAILS_SETTINGS` (A013, A045 `openAppSettings`).
@@ -105,9 +118,17 @@
   - Thiếu `FLAG_ACTIVITY_CLEAR_TASK` thì app đang mở sẽ không chạy lại Splash (xem MO-78).
   - Phải gọi `disableAdResumeOnTime()` trước khi mở App info. Nếu không, lúc user quay lại sẽ dính app-open resume.
   - A045 `common/utils/ShortcutsUtil.kt`: nếu sau `setDynamicShortcuts` list rỗng thì set lại label "UninstaII" (chữ I hoa thay chữ l). Đây là mẹo lách launcher, có rủi ro policy. Không nhân bản khi PO chưa duyệt.
+    - A047 `ShortcutsUtil.createShortcut` cùng tình huống chỉ thử lại với id `UninstaII`, nhãn vẫn là chuỗi `uninstall` đã dịch, nên không đụng Q30.
+  - **Launcher chỉ hiện 4 shortcut** (Pixel / Launcher3): lấy 4 cái rank thấp nhất, từ cái thứ 5 bị ẩn. Có hơn 4 shortcut mà Uninstall rank cuối thì Uninstall biến mất (A049, kiểm trên emulator, 10/2026).
+    - Giữ tối đa 4 (A049 `ShortcutsUtil` đang tắt Horoscope, còn 3 tính năng + Uninstall), hoặc cho Uninstall nằm trong 4 rank thấp nhất. Chốt với PO (Q48).
+  - Activity đã finish (vd Exit gọi `finishAffinity` như A047) rồi mở lại từ Recents: hệ thống giao lại intent shortcut cũ, app có thể vào lại ScrUninstall. Lọc ở `initArgs` (xem MO-78).
+  - Ảnh card tràn ra ngoài card (Figma export kèm bóng, ảnh to hơn card): `size` của ảnh bị kẹp theo khung Box cha. Thêm `wrapContentSize(unbounded = true)` trước `size` (A049 `UninstallCardView`).
 - **QC**:
   - Nhấn giữ icon ở 2 ngôn ngữ khác nhau; kiểm tra thứ tự shortcut.
+  - Đổi ngôn ngữ trong Setting rồi nhấn giữ icon ngay: nhãn đã đổi, không cần mở lại app.
+  - App có hơn 4 shortcut: kiểm trên Pixel / Launcher3 rằng Uninstall vẫn hiện.
   - Mở từ shortcut khi app đã kill, và khi app đang ở màn sâu.
+  - Mở từ shortcut, thoát hẳn (Activity bị finish), mở lại từ Recents: vào như mở thường, không vào lại ScrUninstall.
   - User mới chưa qua FO.
   - Nút gỡ mở App info; từ App info quay lại không hiện resume ad.
   - Light và dark.
@@ -140,13 +161,20 @@
      - Đọc A045 `UninstallViewModel.backToHome`.
   2. Gắn back handler ngay trong composable `ScrUninstall` (BackHandler + predictive, xem MO-81) và gọi hàm trên. Ở A013 thì thêm vào `UninstallScreen`, nhưng đọc bản hiện tại trước xem đã có chưa.
   3. Rời màn theo đường này thì đánh dấu đã xong FO (A013 `prefs.firstOnboard = false`).
+  - **Ref A047/A048 khác A013**:
+    - A048 `UninstallViewModel.backToMain`: 2 nhánh như A045 (stack có `ScrMain` thì pop `ScrUninstall`; không có thì navigate `ScrMain` đúng tab, bỏ `ScrUninstall`). Back cứng là `BackHandler` thường, log `BtnDeviceBack`, không chèn inter.
+    - A049 theo A048 (10/2026): `UninstallViewModel.backToHome` + `GeneralBackHandler(showInterAd = false)`.
+    - A047 dựng sẵn Home dưới `ScrUninstall`: `SplashViewModel.nextScreen` navigate `ScrMain` rồi mới đẩy `ScrUninstall`, nên mọi lối ra chỉ cần pop. Back cứng, header back và icon home chèn inter in-app theo interval (`DeviceBackHandler` → `InterInAppEffect`), nút "Keep" thì không.
+    - Đánh dấu xong FO khi rời màn (bước 3): A047 có (`markFirstOpenDone`), A048 không. A049 có (`prefs.firstOpen = false` trong `backToHome`, cả lúc Try): user yêu cầu dù A048 không làm (Q46).
 - **Bẫy**:
   - Handler phải nằm trong nội dung entry, tức đăng ký sau `NavDisplay`. Như vậy mới chặn trước được `NavDisplay.onBack` (dispatcher chạy theo LIFO).
   - `GeneralBackHandler` của A045 mặc định chèn `inter_inapp` khi back cứng. Muốn về Home mà không có ad thì đặt `showInterAd = false` (chốt với MO).
   - Đừng để back ở ScrUninstall rơi thẳng vào popup Exit của Home.
+  - Try 1 tính năng mà không bỏ `ScrUninstall` khỏi stack thì back từ màn tính năng lại về ScrUninstall (ghi chú ở A047 `UninstallViewModel`, `UNINSTALL_POPUP_TO`).
 - **QC**:
   - Android ≤13 bấm nút back. Android 14+ vuốt cả 2 mép.
   - Mở từ shortcut cả khi app đã kill lẫn khi app đang background.
+  - Try 1 tính năng rồi back từ màn tính năng: về Home, không về ScrUninstall.
 
 ## MO-76 — Popup / thanh gợi ý add widget
 
@@ -329,12 +357,13 @@
     - A013, a044: `notification_pinned`.
     - A045, A47: `open_from_notification_pinned`.
     - Mở thường từ icon: a033/a034/a037 log `app_<app_name>`, A045 log `default`.
+    - A048, A049: `notification_win_back`, `notification_lockscreen`, và `shortcut` cho cả shortcut tính năng lẫn noti shortcut (noti có thêm `notification_clicked`). Mở thường log `app_<app_name>`.
   - Tên hằng pinned cũng lệch (ghi alias khi grep):
     - `OPEN_FROM_PINNED_NOTIFICATION`: A013, SDK, A028, a031, a034, a036, a041 core/ads.
     - `OPEN_FROM_NOTIFICATION_PINNED`: A014, a016, a044, A045, A47.
     - `OPEN_FROM_NOTIFY_PINNED`: a033, Langofy, a041 core/common.
     - `OPEN_FROM_PINNED_NOTI`: a037, a039.
-  - A045 log thêm `notification_clicked` (param `type`).
+  - A045 log thêm `notification_clicked` (param `type`). A047, A048, A049 cũng log (`MainActivity.initArgs`).
 - **Cách làm**:
   1. **Một helper dựng Intent re-open** (ACTION_VIEW + NEW_TASK|CLEAR_TASK + KEY_OPEN_FROM/KEY_OPEN_TO) cho MỌI lối vào: noti, widget, shortcut, lock screen, FCM.
      - PendingIntent dùng `getActivity` trực tiếp, request code riêng cho từng loại, `FLAG_IMMUTABLE | FLAG_UPDATE_CURRENT`.
@@ -349,18 +378,32 @@
   6. **XML/Fragment, non-SDK**: cùng flags, đích là Activity Splash.
      - a033 `FirstOpenActivity.onNewIntent` gọi `resetState` + `initArgs` + `recreate()`. Chỉ chấp nhận `recreate()` khi back stack KHÔNG saveable.
      - a041 `FirstOpenActivity.onNewIntent` chỉ log tracking, không reset. Muốn reset thì phải dựa hoàn toàn vào CLEAR_TASK.
+  - **Ref A047/A048 khác A013**: `onNewIntent` không restart task, chỉ `setIntent` + `initArgs` (A047, A048), tức dựa hẳn vào CLEAR_TASK của mọi intent. A048 bỏ qua intent kéo app về từ Settings (extra `EXTRA_BRING_TO_FRONT`, MO-90). A049 theo A013: restart task khi intent có `OpenFrom.KEY`.
 - **Bẫy**:
   - Chỉ NEW_TASK (thiếu CLEAR_TASK) với singleTask: vào `onNewIntent` và đứng nguyên màn cũ. Không Splash, không ad.
   - Android 12+ chặn "notification trampoline" (noti mở Service/Receiver rồi từ đó mới startActivity). Noti phải `getActivity` thẳng.
   - Log trong `onCreate` mà không check `savedInstanceState` thì xoay màn hoặc restore sẽ log đôi.
   - App vừa từ nền lên qua noti: SDK có thể show resume ad đè Splash vì `lastScreen` còn là màn cũ. A013 xử lý bằng cách clear `lastScreen`, và Splash gọi `disableAdResumeOnTime()`.
   - Trùng request code PendingIntent thì extras của noti này đè noti kia.
+  - **Mở lại từ Recents sau khi Activity đã finish** (vd Exit gọi `finishAffinity` như A047; task vẫn nằm trong Recents): hệ thống tạo lại Activity bằng intent gốc của task, có thể là intent noti / shortcut đã bấm từ trước, kèm cờ `FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY`. Không lọc thì log lại `app_open_from` cũ và nhảy lại màn đích cũ. A047, A049 `MainActivity.initArgs` bỏ qua extras khi có cờ này; A013 chưa lọc.
+  - **Process bị thu hồi khi task còn trong Recents** (hệ thống kill ở nền, tool kill process): mở lại là cold start
+    nhưng có `savedInstanceState`, `rememberNavBackStack` khôi phục màn sâu → bỏ qua Splash và ad; màn giữ dữ liệu
+    trong bộ nhớ (kết quả) ra trống. A047 để vậy (coi là không phải lượt mở mới). A049 (16/10, user chốt) gọi
+    `super.onCreate(null)` khi process mới (cờ static `processStarted`), chạy như mở mới và bỏ extras của intent cũ.
+    QC: về nền ở màn sâu → `adb shell run-as <pkg> kill -9 <pid>` → mở từ launcher (`am kill` không giết app vừa ở nền).
+  - **Process cũ còn sống**: lượt re-open tạo Activity mới nhưng `AdsManager` (singleton) vẫn giữ unit splash ở `IMPRESSED` / `FAIL`. Hàm nạp kiểu "chỉ nạp khi `NONE`" sẽ bỏ qua: Splash không có ad, đứng tới timeout (không có timeout thì treo hẳn). Reset unit splash ở `onCreate` của lượt mở mới (A013 `AdsManager.resetState`, A047 và A048 `resetSplashAds`, A049 `resetState`).
+  - **Home chỉ là trạm trung chuyển** khi lượt mở có đích là tính năng: không bật popup / noti của Home (shortcut noti, xin quyền noti, preload reward). Chụp cờ lúc dựng màn bằng `remember`, vì hàm mở tính năng tiêu `openTo` trước khi Home kịp RESUMED (A047 `MainScreen`, A049 `HomeScreen`, biến `passingThrough`). A013 chưa có cờ này: ref A013 thì đề xuất trong báo cáo, không tự thêm (luật cứng 10).
+  - Log mở thường bằng `app_` + `R.string.app_name` viết thường (A048, A049): chuỗi này phải không dịch (A048 khai `translatable="false"`), nếu không giá trị đổi theo ngôn ngữ. Tên có dấu cách thì giá trị cũng có (A049 `app_palm ai`).
 - **QC**: Với từng lối vào, thử 3 trạng thái app (đã kill / background ở màn sâu / foreground). Kiểm tra:
   - luôn đi Splash có ads,
   - tới đúng màn,
   - back từ màn đích không về màn cũ,
   - `app_open_from` đúng,
   - không có 2 ad liên tiếp.
+  - Ca riêng:
+    - Mở từ noti / shortcut, thoát hẳn (Activity bị finish), mở lại từ Recents: như mở thường, không log lại `open_from` cũ, không vào lại màn đích cũ.
+    - Mở lại qua noti / shortcut khi process còn sống (app vừa ở nền): Splash vẫn nạp và show ad, không đứng tới timeout.
+    - Mở tính năng từ noti / shortcut: không có popup hay noti của Home bật lên giữa đường (app có cờ kiểu `passingThrough`).
 
 ## CC-3 — Banner kiểu noti/widget nổi giữa màn hình, giục user quay lại (ứng viên)
 

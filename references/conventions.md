@@ -6,7 +6,9 @@ phát hành thì không làm vỡ cấu hình MO đang chạy trên Firebase.
 ## 1. Thứ tự chọn tên
 
 Áp cho **key Remote Config, placement ads, event tracking, ad unit/nameSpace, hằng OPEN_FROM/OPEN_TO**.
-1. **Tên user hoặc ticket đưa** (vd ticket ghi rõ key `xxx`).
+1. **Tên user hoặc ticket đưa** (vd ticket ghi rõ key `xxx`). Với tracking (event, param, giá trị
+   `open_from`), PO còn ghi trong tab của app ở sheet "Universal Events & Parameters" (dòng "PO request",
+   khối User Journey Event): tên ở đó tính là "ticket đưa".
 2. **Tên app đang có.** Dò bằng `audit.py --item <ID>`: dòng `RC:` cho biết app đang dùng key chuẩn
    (`✓`) hay alias. Alias của mọi app nằm trong `catalog.json` (`rc_keys[].aliases`,
    `placements[].aliases`).
@@ -19,13 +21,22 @@ Kèm theo:
   đúng đơn vị của chuẩn.
 - Theo **kiểu tổ chức RC** của app:
   - key phẳng `SharedPreferenceProperty("key", default)` như A013 và đa số app;
-  - hoặc JSON nhóm (`language_config`, `onboard_config`, `noti_config`… ở a037, Langofy, a034). Khi đó
-    thêm field vào đúng nhóm và báo đường dẫn JSON cho MO.
+  - hoặc JSON nhóm (`language_config`, `onboard_config`, `noti_config`… ở a037, Langofy, a034, a045 từ v1.0.9,
+    A047, A048, A049). Khi đó thêm field vào đúng nhóm và báo đường dẫn JSON cho MO. a045, A048, A049 đọc nhóm
+    qua `RcGroup` (`domain/preference/RcGroup.kt`, khai nhóm trong `SharedPrefs.kt`), field lồng viết dạng
+    `tick.size`, `lockscreen.slots`.
 - Theo **kiểu tên placement** của app: `language`/`language_alt`/`onboard_1`/`fs_onboard` (chuẩn A013) hay
   `native_lang`/`native_lang_alt`/`native_ob1`/`native_fsob` (a016, a037, a039, Langofy). App mới hoặc
   chưa có kiểu thì dùng chuẩn A013.
 - Key mới bắt buộc có **default an toàn trong code**, tức là chưa fetch được RC thì app vẫn đúng hành vi
   mặc định MO muốn. Báo key + default cho MO trong báo cáo.
+- Giá trị RC đưa thẳng vào thư viện (base URL Retrofit, màu, Uri) phải được kiểm, sai thì fallback, nếu không
+  là crash. Vd A049 `PalmLineConfig.resolveBaseUrl`: chỉ nhận URL https mà `toHttpUrlOrNull` parse được.
+- Mục MO thêm hoặc đổi key RC thì cập nhật **tài liệu RC của app** trong cùng commit. Khung mẫu: a037
+  `docs/remote-config-group.md`, A049 `docs/features/remote-config.md` — bảng key (kiểu, ai đọc: App/SDK, từ phiên
+  bản), quy tắc từng field, thời điểm có hiệu lực, bẫy, test case. Sheet "Remote config" trong file checklist PO
+  của app: key SDK để trên, key app để dưới; cột Version note = phiên bản bắt đầu có key, key SDK thêm "(SDK)" (A049:
+  "Từ v1.0.1 (SDK)").
 
 ## 2. Tên chuẩn A013 (ảnh chụp lúc viết — lệch thì theo code A013 hiện tại)
 
@@ -45,6 +56,23 @@ Kèm theo:
   - Mở từ file của app khác (open-with): A013 log `open_from_gallery`.
 - Mọi đường mở lại app (noti, widget, shortcut, open-with) đều **đi qua Splash** (`CLEAR_TASK`) để ăn
   ads, rồi mới tới tính năng đích (MO-78).
+- **Giá trị `open_from` PO chốt** (sheet "Universal Events & Parameters", dòng "PO request" của tab app,
+  10/2026). App có tab này thì theo PO, không theo tên A013 ở trên:
+  - `notification_pinned`, `notification_kill`, `notification_daily`, `notification_click_ads`, `shortcut`,
+    `shortcut_uninstall`, `gallery`, `widget`, `home_screen` (homeapp);
+  - mở thường từ launcher/recents = `app_{app_name}`. A048: tiền tố `app_` + `R.string.app_name` viết
+    thường, giữ khoảng trắng (A049 ra `app_palm ai`; 16/10 đổi tên app thành Hastgy nên ra
+    `app_hastgy`: đổi `app_name` là đổi giá trị tracking, phải báo MO/DA). A048/A049 log `app_open_from` ở **mọi** lượt mở, kể
+    cả mở thường (`MainActivity.initArgs`);
+  - `app_name` đọc theo ngôn ngữ app: A048 khai `translatable="false"`; A049 có bản dịch nhưng mọi locale giữ
+    cùng một tên (từ 16/10 là "Hastgy"). Bản dịch nào đổi tên app thì giá trị này đổi theo ngôn ngữ;
+  - loại PO chưa liệt kê, theo A048: `notification_win_back`, `notification_lockscreen`. Không dùng được
+    full-screen intent: A048 bắn thêm event `notification_lockscreen_un_support` lúc post noti; A049 bắn event
+    đó và còn dùng tên này làm giá trị `open_from` khi user bấm noti (như A013
+    `notification_lock_screen_un_support`);
+  - A048/A049 giữ ở enum `OpenFrom(trackingName, notificationType)`: `trackingName` = giá trị `open_from`,
+    `notificationType` = param `type` của event `notification_clicked` (A048 `Tracking.logNotificationClicked`,
+    A049 log thẳng trong `MainActivity.initArgs`).
 
 ### Placement (ads_config) cho luồng MO
 - **Splash:** `splash` (+ `inter_splash_high`, `inter_splash_all`, `native_full_splash`, `bottom_splash`).
@@ -64,6 +92,21 @@ Kèm theo:
 - `iaa_request` / `iaa_loaded` / `iaa_fail_load` / `iaa_impression` / `iaa_fail_show` / `iaa_click` /
   `iaa_complete`: SDK tự bắn, có param `placement`.
 - `sdk_init`: SDK tự bắn, đo thời gian init.
+- **Tên track dùng chung cho màn/overlay/nút của mục MO** (theo `naming-rules.md` của skill `build-tracking`,
+  đã có ở A048 và A049; tên nút `Btn` + PascalCase, không gạch dưới):
+  - back cứng / vuốt back: `button_click` `button_name=BtnDeviceBack` (không dùng `device_back`);
+  - popup mất mạng (MO-26): `OvlNoInternet`, nút `BtnOpenSettings`;
+  - loading trước inter in-app và lúc SDK nạp `app_resume` (EXT-AD-LOADING): `overlay_show` `OvlAdsLoading`.
+    `naming-rules.md` ghi tên này chưa thống nhất (a037 `OvlAdLoading`): app cũ giữ tên đang có trên sheet;
+  - popup xác nhận ngôn ngữ (MO-86, MO-94): `OvlConfirmLanguage`, nút `BtnConfirm` / `BtnCancel` / `BtnClose`;
+  - noti màn khoá (MO-95): `screen_show` `ScrNotificationLockScreen<N>` (N = layout 1, 2, 3), nút `BtnClick`
+    (mở app) / `BtnNotiClose`;
+  - màn Uninstall (MO-74, MO-91): `ScrUninstall`, nút thử tính năng `BtnTryNow<Feature>` (A048
+    `BtnTryNowTranslate`…), không dùng 1 tên chung kèm param.
+- **Param PO dùng chung** (dòng "PO request" của sheet trên): `language` = mã viết hoa (`EN`) ở `BtnNext` /
+  `BtnApply` màn ngôn ngữ; `rating` = "1"…"5" và `rating_bad` ở `BtnSubmit` popup đánh giá. A048, a044,
+  A049 gom ở object `TrackingParams` (`common/utils/TrackingParams.kt`): `rating_bad` = tên resource của lý
+  do, chọn Other thì là chữ user gõ, cả hai viết thường + khoảng trắng → `_`.
 - Event riêng của từng mục MO ghi trong field `events` của catalog. Muốn dựng sheet tracking đầy đủ thì
   dùng skill `build-tracking` (nếu repo có).
 
@@ -112,7 +155,8 @@ với package đang có cùng vai trò.
 - Skill **không lưu code**. Recipe chỉ chỉ tới file + symbol của A013; lúc làm luôn đọc code A013
   **bản hiện tại**.
 - Mỗi mục ghi `canonical.verified_commit`: commit lần cuối recipe được đối chiếu. `audit.py --app a013`
-  tự so file chuẩn với commit đó và báo `↺` nếu đã đổi. Khi đó:
+  (mục có `canonical.app` khác, vd EXT-AD-LOADING → a048, thì `--app` app đó) tự so file chuẩn với commit đó
+  và báo `↺` nếu đã đổi. Khi đó:
   - theo code hiện tại;
   - người bảo trì sửa lời recipe;
   - cập nhật `verified_commit` (xem SKILL.md § update-catalog).
@@ -133,7 +177,7 @@ Remote config (MO tạo/kiểm trên Firebase)
 | Key | Kiểu | Default | Nguồn tên |
 | noti_lockscreen_enable | Boolean | true | chuẩn A013 (app chưa có) |
 
-Placement / tracking: … · Phụ thuộc đã kiểm: MO-78 (đã có)
+Placement / tracking: … (nameSpace + placement mới phải thêm cả vào ads_config trên Firebase) · Phụ thuộc đã kiểm: MO-78 (đã có)
 QC: … (xem references/notifications.md § MO-95)
 TODO(mo): copy 3 slot noti, ảnh minh hoạ
 
@@ -147,7 +191,10 @@ Lỗi ngoài phạm vi phát hiện được (nên tách ticket): …
 
 [Nếu ref ≠ A013] Khác biệt ref aXXX vs A013
 | Khía cạnh | aXXX (đã làm theo) | A013 | Nhận xét |
+Nghiệm thu ref thiếu, chưa thêm (hỏi user; còn thì mục là Partial): …
+Chỗ khác ref vì luật repo: …
 
 Diff: git -C <repo> diff (hoặc đường dẫn patch nếu làm trong worktree)
 Dòng cho sheet MO: MO-95 | Noti lock screen | a036 v1.1.1 | Done | chờ QC
+(mục ngoài sheet: EXT-AD-LOADING (ngoài sheet) | Loading trước ad full-screen | a049 v1.0.1 | Done | …)
 ```

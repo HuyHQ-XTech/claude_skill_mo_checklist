@@ -196,7 +196,7 @@ mo-checklist/
 ├── SKILL.md              # hướng dẫn cho Claude (quy trình, luật) — điểm vào của skill
 ├── README.md             # file này (cho người)
 ├── CHANGELOG.md          # lịch sử phiên bản
-├── CATALOG.md            # bảng tra 113 mục + key RC chuẩn (sinh tự động)
+├── CATALOG.md            # bảng tra 114 mục + key RC chuẩn (sinh tự động)
 ├── catalog.json          # dữ liệu gốc của các mục (spec, nghiệm thu, key RC, mẫu dò…)
 ├── apps.json             # mã app → tên thư mục repo + URL để clone
 ├── local.json            # (tuỳ chọn, riêng từng máy, không commit) thư mục chứa các repo app

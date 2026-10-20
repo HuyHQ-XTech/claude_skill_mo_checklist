@@ -106,9 +106,15 @@
    ],
    "remote": "git@github.com:xTech-Android/A47_Tarot-Reader.git"
   },
+  "a048": {
+   "name": "Live Translator",
+   "dir": "A048_Live-Translator_SVlink",
+   "remote": "git@github.com:xTech-Android/A048_Live-Translator_SVlink.git"
+  },
   "a049": {
-   "name": "(chưa có code)",
-   "dir": "a049"
+   "name": "Palm AI",
+   "dir": "A049_Palm-AI",
+   "remote": "git@github.com:xTech-Android/A049_Palm-AI.git"
   },
   "sdk": {
    "name": "xTechSDK (xtechads)",

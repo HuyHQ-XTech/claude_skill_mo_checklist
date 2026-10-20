@@ -24,6 +24,7 @@
   - App khác: tính từ thư mục package gốc.
   - Tìm theo symbol (`grep -rn`) và luôn đọc code A013 bản hiện tại.
 - **App không dùng SDK** (có `ads/base/BaseAds.kt` riêng): A028, a036, a041.
+- **Loading trước ad full-screen** (inter in-app + app resume): mục ngoài sheet, xem § EXT-AD-LOADING ở cuối file.
 
 ## MO-79 — Toast / notification sau khi click ad (+ RC delay)
 
@@ -200,10 +201,17 @@
     - Chỉ 1 `BackHandler`. Log `button_click` (`device_back`), mặc định chèn inter (`showInterAd`; tắt ở màn FO).
     - Ghi chú trong code: chèn ad ở `NavDisplay.onBack` KHÔNG có tác dụng, vì handler của màn đã nuốt back trước.
   - **A47** `ads/AdsEffects.kt` `InterBackHandler` + `common/utils/DeviceBackHandler.kt` (log `BtnDeviceBack`). Ghi chú: handler của màn đăng ký sau handler của `NavDisplay` nên thắng (dispatcher chạy LIFO).
-  - App có khai `android:enableOnBackInvokedCallback="true"`: A014, a016, A028, a031, a033, a037, Langofy, a044, A045, A47.
+  - **A049** `ui/properties/GeneralBackHandler.kt`: như A045 (1 `BackHandler`, mặc định chèn inter, `showInterAd = false` ở màn không muốn ad), nhưng log `BtnDeviceBack`.
+    - Trước 15/10/2026 chỉ màn Settings để mặc định, nên inter in-app chỉ có ở back cứng màn Settings.
+    - Từ 15/10/2026 (sheet Ad script, user chọn làm như A047): màn tính năng + Settings dùng `DetailScreenState` +
+      `InterBackHandler` (`ads/AdsEffects.kt`). Back cứng, vuốt và nút back / Home / X trên header đều qua inter. Nút
+      Home ở màn kết quả gọi `onRequestHome()` (màn có 2 đích rời: header về Home, back cứng về màn trước).
+      TarotDraw đang chọn lá thì back chỉ bỏ chọn, không có ad.
+  - App có khai `android:enableOnBackInvokedCallback="true"`: A014, a016, A028, a031, a033, a037, Langofy, a044, A045, A47, A048, A049.
 - **Placement / tracking**:
   - Placement `inter_inapp`.
   - Nên log back cứng như 1 nút bấm (`button_click`, `button_name` = `device_back` / `BtnDeviceBack`) để gộp được vào funnel.
+    - App mới (A47, A048, A049) dùng `BtnDeviceBack`, theo rule tên nút Btn + PascalCase.
 - **Cách làm**:
   1. **1 composable back dùng chung cho cả app**: `BackHandler` cho API ≤33 + `PredictiveBackHandler` cho API ≥34, hoặc chỉ 1 `BackHandler` như A045. Đọc `ui/base/AppBackHandler.kt` ở A013.
   2. **Mỗi màn có inter khi back**: tạo đúng 1 lambda "back có ad", dùng chung cho header back và back handler. Đọc `RecoveredScreen` ở A013 làm mẫu.
@@ -212,6 +220,7 @@
 - **Bẫy**:
   - Gọi `GeneralBackHandler` của A013 mà chỉ truyền `onBack`: ở API 34+ back bị nuốt và không làm gì, vì `onPredictiveBack` = null.
   - Cả handler của màn lẫn `NavDisplay` cùng xử lý thì sẽ pop 2 lần.
+  - Hàm show inter gọi `onNext` cả lúc ad hiện lẫn lúc đóng ad thì back cũng pop 2 lần. Chốt 1 lần (xem MO-82).
   - Bấm back liên tục khi ad đang load: show ad / điều hướng bị lặp. Cần cờ "đang xử lý".
   - Không chèn inter ở:
     - Home: back = popup Exit.
@@ -262,12 +271,12 @@
 - **Remote config** (đơn vị lệch nhau giữa các app, kiểm tra kỹ):
   - **Lead / buffer**:
     - `preload_lead_inter` (Long ms, `5000`): A013.
-    - `preload_inter_buffer_second` (Long giây, `5`): A014, a016, a034, a044, A045, A47, a041 core/ads. a033 đọc rồi ×1000.
+    - `preload_inter_buffer_second` (Long giây, `5`): A014, a016, a034, a044, A045, A47, A048, A049, a041 core/ads. a033 đọc rồi ×1000.
     - `second_preload_inter_buffer` (giây, `5`): a039.
     - `preload_inter_interval` (giây, `5`): a27, a037. a037 dùng làm lead cho cửa sổ cố định 15s / 60s.
   - **Interval**:
     - `interval_skip_inter` (Long ms, `20000`): SDK, A013, a039, a041. A028 dùng `15000`, a036 dùng `20000`.
-    - `interval_inter_inapp` (ms): A47 `20000`, Langofy `30000`.
+    - `interval_inter_inapp` (ms): A47 `20000`, A048 `30000`, A049 `20000` (theo sheet Ad script, 15/10/2026), Langofy `30000`.
     - `time_interval_inter` (ms, `20000`): a044.
     - `inter_all_interval` (ms): a033 `15000`, Langofy `45000`.
   - **Điều kiện**:
@@ -281,9 +290,11 @@
   1. **1 cửa duy nhất `showInterInApp(activity, onNext)`**:
      - Đủ thời gian (now − lastShow ≥ interval) mới show.
      - Chưa đủ hoặc không có ad thì gọi `onNext` ngay.
+     - Loading trước ad (EXT-AD-LOADING, nếu app làm) nằm ngay trong cửa này.
      - Đọc A013 `AdsManager.showInterInApp` và a044 `showInterInApp`.
   2. **Đóng dấu `lastShow`**:
      - Đóng dấu khi ad thật sự hiện. Chốt 1 quy ước: lúc impression hay lúc close.
+     - Các ref đang dùng 3 mốc khác nhau, xem đoạn "Ref A047/A048 khác A013" bên dưới (Q28).
      - Dùng cùng 1 loại đồng hồ với chỗ gate.
   3. **Scheduler**:
      - Sau mỗi lần show (và lần đầu vào màn chính) hẹn load ở mốc (interval − lead).
@@ -292,6 +303,28 @@
      - Đọc `AdsManager.schedulePreloadInterInApp` ở A013.
   4. **Arm thêm** ở chỗ đổi màn (như `TrackingScreenName` của A013) cho chắc.
   5. **Khai RC đúng đơn vị**. App dùng giây thì nhân 1000 ở đúng 1 chỗ.
+  - **Ref A047/A048 khác A013** (đọc `ads/AdsManager.kt` bản hiện tại):
+    - Mốc interval:
+      - A013: impression của mọi inter, cả splash (`markShown`).
+      - A047: lúc đóng của mọi inter, cả splash (`onInterClosed`, `lastInterClosedAt`).
+      - A048, A049: `onAdShow` của riêng `inter_inapp` (`lastInterInAppShownAt`, `elapsedRealtime`). Inter splash không tính, nên inter in-app có thể hiện ngay sau splash nếu đã có ad.
+    - Có cổng thời gian lúc show: A047 `canShowInterInApp`, A048 và A049 kiểm trong `showInterInApp`. A013 chỉ xét "đã có ad".
+    - Arm:
+      - A047: `MainScreen` gọi `startInterPreload`, rồi mỗi lần đóng ad, và `onStart`.
+      - A048 `MainScreen` / A049 `HomeScreen`: `LaunchedEffect` chờ `initFinished.first { it }` rồi `loadInterInApp`; sau mỗi lần show xong; và `onStart`. Hàm arm là `armInterInAppPreload`.
+      - Chưa show lần nào thì nạp ngay, không chờ.
+    - Nền: cả 3 huỷ ở `onStop`. A048, A049 chỉ cancel, giữ job làm dấu "đã từng arm" để `onStart` arm lại; A047 dùng cờ `interPreloadStarted`.
+    - Điều hướng: A013, A047, A049 gọi `onNext` lúc ad hiện (màn sau dựng sẵn dưới ad). A048 gọi lúc đóng ad.
+    - A048 thêm đếm lượt theo tính năng (`inter_inapp_use_count`, đếm trong RAM theo session), AND với interval.
+    - Key: A047 `interval_inter_inapp` (20000), A048 `interval_inter_inapp` (30000), A049 `interval_inter_inapp` (20000) theo sheet Ad script từ 15/10/2026, trước đó đọc `interval_skip_inter` của SDK. Cả 3 dùng `preload_inter_buffer_second` (giây, 5).
+    - App đã làm: A049 (10/2026) theo A048.
+    - A049 thêm inter `inter_replace_reward` (tên theo A047) cho 4 nút làm lại ở màn kết quả, thay reward (sheet
+      Ad script 16/10): nạp lúc bấm sau OvlAdsLoading, dùng chung `interval_inter_inapp`. Lần show này cũng ghi mốc
+      interval của inter rời màn, đóng thì hẹn nạp lại `inter_inapp`. Placement mới phải có cả nameSpace + placement
+      trên Firebase `ads_config`; thiếu thì nút làm luôn, không có ad.
+      - Icon ad trên nút là quyết định riêng của app, không phải luật chung. A049 (user 16/10): chỉ `BtnScanAgain`
+        (Palm Analysis, Life Guide) giữ icon ad khi placement bật; Try another match, Draw again, Check another sign
+        dùng icon refresh cố định nhưng vẫn chạy inter như cũ.
 - **Bẫy**:
   - Nhầm ms và giây: lead của A013 là ms, đa số app khác dùng giây.
   - RC số khai Int thì luôn trả default.
@@ -299,10 +332,20 @@
   - Không huỷ timer khi app ở nền thì tốn request thừa.
   - Ad preload để quá 1h sẽ hết hạn, phải load lại.
   - Ad vừa hiện mà user chuyển màn ngay, có thể arm trước khi dấu impression về, nên lần arm đó tính theo mốc cũ. Arm thêm lúc đóng ad để chắc chắn.
+  - Arm lúc ad đang hiện hoặc vừa đóng: SDK gọi `onAdClosed` TRƯỚC khi hạ `isShowingAds` (`InterstitialAdUnit.show`, `onAdDismissedFullScreenContent`). Nếu mốc đã qua (lượt nạp đầu lúc ad splash còn trên màn, hoặc user xem ad lâu hơn interval − lead) mà scheduler có guard "đang show ad thì bỏ" (như A013) thì mất lượt nạp. A048, A049 chờ cờ hạ (poll 200ms) rồi mới nạp; A047 không arm khi `isInterShowing`, hạ cờ đó rồi mới arm lúc đóng ad.
+  - Chỉ nạp `inter_inapp` sau khi một inter in-app đã đóng thì ad không bao giờ có, `showFullScreen` luôn đi tiếp ngay. Phải có lượt nạp đầu khi vào màn chính (A049, 10/2026).
+  - Đừng gate bằng "HOẶC đủ `screen_skip_inter` màn": nhánh này cho show trước mốc, trái nghiệm thu. A013 (`canShowInter` không dùng), A047, A048 đều không gate theo số màn; A049 đã bỏ nhánh này (10/2026).
+  - Nối `onNext` vào cả `onAdShow` lẫn `onAdClosed` (vd để arm lúc đóng) thì 1 lần show gọi `onNext` 2 lần: điều hướng hoặc pop đôi. Chốt 1 lần bằng cờ (A049 `runOnce`, A047 `proceed`, A048 `finish`).
 - **QC**:
   - Interval 20s, lead 5s: show ad, đứng yên; khoảng giây thứ 15 có request; bấm trigger ở giây 20 thấy ad.
   - Bấm ở giây 10: không có ad.
   - Xuống nền 30s rồi lên lại: không có request trong lúc ở nền.
+  - Logcat bản debug: grep `armInterInAppPreload|loadAd: placement=inter_inapp|InterstitialAdUnit.*show:` (A048, A049). A013 thì tìm `arm:` và `fire load` (tag `AdsManager`).
+  - Kiểm mốc: show, đóng ad sau vài giây (trước mốc), đứng yên. Request phải ở (mốc bắt đầu tính interval) + (interval − buffer). Mốc này là lúc ad hiện (A013, A048, A049) hoặc lúc đóng ad (A047). So bằng timestamp trong logcat, không so bằng đồng hồ máy tính.
+  - Tới mốc mà ad còn đang hiện thì A048, A049 chờ ad đóng mới nạp: request lệch mốc trong ca này không phải lỗi.
+  - Kiểm nền: show, đóng, về Home trước mốc, xuống nền qua mốc (khoảng 20s), mở lại. Lúc ở nền không có request; lên lại thì nạp ngay ở `onStart` (A048, A049), trước cả luồng app resume.
+  - User đã qua FO, có inter splash (A048, A049): Home dựng ngay dưới ad splash, nhưng request `inter_inapp` đầu chỉ bắn lúc đóng ad splash, vì arm chờ `isShowingAds` hạ. Không phải thiếu request.
+  - Home có `LaunchedEffect` arm (A048, A049) nên log arm hiện lại mỗi lần về Home. Không sao: mốc tính tuyệt đối, arm lại không làm lệch.
 
 ## MO-93 — Quay về từ ad thì tự sang màn kế (luồng FO)
 
@@ -389,16 +432,26 @@
      - Đọc `BaseAds` (phần app resume) ở SDK.
   2. **Đóng dấu `lastAppResumeShownMs`** (lưu pref để sống qua kill app) khi app-open THỰC SỰ hiện: gán `appResume.onImpression` trong `AdsManager`, hoặc dùng `onAppResumeClosed`.
   3. **Không đụng splash hay inter khác**: giới hạn này chỉ áp cho resume.
+  4. **Loading lúc SDK nạp `app_resume`**: mục riêng EXT-AD-LOADING, không thuộc nghiệm thu DEV-16. Chỉ làm khi user yêu cầu, hoặc app ref đã có.
+     - SDK nạp `app_resume` lúc user quay lại rồi mới show, chờ tối đa `timeout` của namespace mà placement `app_resume` trỏ tới.
+  - **Ref A047/A048 khác A013**:
+    - Cap: A047, A048 override `canShowAppResume` = `true`, A049 không override. Cả 3 chưa có cap.
+    - `timeout` của namespace (user chờ nạp lúc quay lại, Q50): A013 `app_resume` 30000, A047 10000, A048 5000, A049 (namespace `resume`) 10000.
+    - Loading: A013 không dùng 2 hook, vẽ `LoadingAdsView(isShowingAdResume)` ở `AppNavigation` (cờ này bật tới lúc đóng ad). A047, A048 dùng 2 hook `showResumeLoading` / `hideResumeLoading` (EXT-AD-LOADING).
+    - App đã làm: A049 (10/2026) chỉ phần loading và `timeout` theo A047, chưa có cap.
 - **Bẫy**:
   - Đóng dấu lúc mới "thử show" thì no-fill cũng ăn mất 4h.
   - Giữ mốc trong RAM thì kill app là mất giới hạn.
   - Dùng `currentTimeMillis` để giữ khoảng 4h qua reboot. Nếu hiệu số < 0 (user chỉnh giờ) thì coi như đã hết hạn chờ.
   - `disableAdResumeOneTime` (quay về từ Settings / share / click ad) vẫn phải được ưu tiên.
+  - Sửa `timeout` trong `app/config/ads_config.json` không có tác dụng khi RC `ads_config` đã có giá trị: SDK `AdsConfigProvider` dùng bản RC (trừ bản debug bật `AppConfig.useLocalAdsConfig`). Phải sửa cả bản trên Firebase.
+  - Override `onStart` / `onStop` của `BaseAds` (vd huỷ timer MO-82) phải gọi `super`: `BaseAds.onStop` là chỗ SDK đánh dấu app đã xuống nền cho luồng resume.
 - **QC**:
   - Set RC = 1 phút để test.
   - Vào / ra app nhiều lần.
   - Kill app khi còn trong cửa sổ giới hạn.
   - RC = 0.
+  - App có loading lúc nạp `app_resume`: QC theo EXT-AD-LOADING.
 
 ## DEV-21 — Home: collapsible ad, đóng còn mini, quay lại Home lại bung
 
@@ -464,6 +517,55 @@
   - User IAP.
   - Tắt RC.
 
+## EXT-AD-LOADING — Loading trước ad full-screen (inter in-app, app resume) — ngoài sheet
+
+> Không có dòng trong sheet MO nên không có MO-ID. Skill nhận mục này qua prompt ("loading trước inter", "loading
+> ads"…). Nguồn: ticket A049 P4713 (ref A048) cho inter, và loading lúc nạp `app_resume` (ref A047). Dòng dán sheet
+> MO ghi `EXT-AD-LOADING (ngoài sheet)`.
+
+- **Yêu cầu**:
+  - Trước mỗi inter trong app (trừ splash): hiện màn loading "Loading Ad..." trong `time_show_loading_ads`, rồi mới show ad.
+  - Không có ad sẵn thì đi tiếp ngay, không hiện loading.
+  - Lúc SDK nạp `app_resume` (user quay lại app) cũng hiện loading này, để user không thao tác trên màn rồi bị ad bật đè.
+- **Nghiệm thu**:
+  - Có ad sẵn: loading hiện khoảng `time_show_loading_ads` rồi ad hiện.
+  - Không có ad sẵn: không hiện loading, đi tiếp ngay.
+  - Quay lại app lúc SDK nạp `app_resume`: loading hiện tới khi ad hiện, nạp hụt hoặc hết `timeout` của nameSpace.
+  - Loading chặn back và chạm; bắn `overlay_show` `OvlAdsLoading`.
+- **SDK**:
+  - Không có bước loading trước inter đã nạp sẵn: `AdGroupUnit.showFullScreen` show ngay. App tự hiện loading rồi mới gọi.
+  - `FullscreenAdObserver` có slot `loading`, nhưng chỉ hiện lúc chưa có ad và đang nạp theo yêu cầu. Ngược nghiệm thu "không có ad sẵn thì đi tiếp ngay".
+  - `app_resume`: 2 hook `showResumeLoading` / `hideResumeLoading` của `BaseAds`. SDK tự gọi hide khi ad hiện, khi show lỗi, khi nạp hụt hoặc hết timeout.
+- **Chuẩn của mục này = A048** (A013 không có, chỉ có `LoadingAdsView` cho app resume, xem DEV-16):
+  - `ads/AdsManager.kt`: `showInterWithLoading`, `adLoadingVariant`, `isAdCoveringScreen`.
+  - `ads/AdsLoadingOverlay.kt` vẽ trong `MainActivity`.
+  - A047: `ui/dialog/AdLoadingDialog.kt` host ở `MainNavigation`, dùng cho resume và làm `loading` của `FullscreenAdObserver` (inter / reward nạp lúc bấm). `inter_inapp` của A047 không có loading.
+  - App đã làm: A049 (10/2026) theo A048: `AdsManager.showInterWithLoading`, `showLoadingDialog`. Dialog lấy từ A047 (`ui/dialog/AdLoadingDialog.kt`), host 1 lần ở cuối `AppNavigation`.
+- **Remote config**:
+  - `time_show_loading_ads` (Long ms): A048, A049 `1000`; a039 cùng tên `500`, dùng ở `ui/common/widget/InterAdTrigger.kt`.
+  - Thời gian chờ nạp `app_resume` = `timeout` của nameSpace mà placement `app_resume` trỏ tới. Số của từng app và bẫy RC `ads_config` đè file local: xem DEV-16.
+- **Placement / tracking**:
+  - `inter_inapp` và mọi inter khác trừ splash (A048 thêm `inter_after_ob`); `app_resume`.
+  - `overlay_show` `OvlAdsLoading`.
+- **Cách làm**:
+  1. Mọi inter trừ splash đi qua 1 hàm có bước loading (A048, A049 `AdsManager.showInterWithLoading`):
+     - unit chưa `SUCCESS`, hoặc loading đang hiện: gọi tiếp ngay, không loading;
+     - còn lại: bật state loading, chờ `time_show_loading_ads`, rồi `showFullScreen`.
+  2. Inter in-app: tắt loading ở `onNextAction` / `onAdFailedToShow` / `onAdClosed` (và khi lỗi), không tắt ở `onAdShow`.
+     App resume thì SDK tự gọi `hideResumeLoading` lúc ad hiện, nạp hụt hoặc hết timeout.
+  3. App resume dùng chung state qua 2 hook `showResumeLoading` / `hideResumeLoading`, gán trong `init` của `AdsManager` (A047, A048, A049).
+  4. Host đúng 1 chỗ ở gốc UI, chặn back và chạm, tag `OvlAdsLoading`.
+  5. Gộp state loading vào cờ "đang có ad trên màn" (A048 `isAdCoveringScreen`, A049 `isAdOnScreen`). Popup / noti khác đọc cờ này để không bật lên lúc loading (A049: noti kill-app ở `MainActivity.onStop`; A048: rating, tracking màn).
+- **Bẫy**:
+  - Tắt loading ở `onAdShow` thì app điều hướng lúc đóng ad (A048) lộ màn cũ 1 nhịp lúc ad vừa đóng.
+  - Lottie random: lúc Lottie đang parse thì khung đầu chỉ có chữ (A049, máy thật, 10/2026). File nặng thì chờ lâu hơn (chưa đo).
+    - A048 đã bỏ 3 file nặng nhất (154–316KB, commit `c68793f`), còn 6 file ≤ 16KB. A047, A049 còn 2 file khoảng 300KB.
+  - Không vẽ gì lúc SDK nạp `app_resume` thì user thao tác tới hết `timeout`, rồi ad bật đè bất ngờ (A049 bản đầu, timeout 30000, sửa 10/2026).
+- **QC**:
+  - Trigger inter lúc có ad: loading khoảng `time_show_loading_ads` rồi mới tới ad; logcat `overlay_show` `OvlAdsLoading`.
+  - Trigger lúc chưa có ad: đi tiếp ngay, không loading.
+  - Home → nền → mở lại: loading hiện ngay, tắt khi ad hiện. No-fill: tắt ngay khi nạp hụt. Mạng chậm: tắt khi hết `timeout`. Cả 2 ca không có ad.
+
 ## CC-2 — Bắt xem N reward ad mới được dùng tính năng (ứng viên)
 
 - **Yêu cầu**:
@@ -494,6 +596,18 @@
   5. Ad fail: toast, giữ nguyên số đã xem.
   6. Nút hiện tiến độ (k/N).
   7. Sau mỗi lần đóng ad thì preload sẵn ad kế tiếp.
+- **App đã làm: A049** (N = 1, không có bộ đếm; 10/2026). Các nút có icon ad theo sheet Ad script: Scan (Palm
+  Analysis, Life Guide), Check Compatibility, Read my card, Check now.
+  - `reward_all` nạp lúc bấm (OvlAdsLoading) hoặc nạp sẵn khi vào Home, theo RC `position_load_reward`
+    (`button` / `home`, như A047).
+  - Reward không chạy được (placement tắt, đã mua, consent không cho ad): kiểm lại lúc bấm, chạy tính năng luôn, không
+    toast (16/10). Trước đó điều kiện chỉ chốt lúc tạo ViewModel, nên RC về muộn làm user kẹt ở toast lỗi.
+  - Tải ad lỗi (no fill, mất mạng, lỗi tải): RC `reward_fail_continue` (Boolean, mặc định `true`; user chọn tên
+    19/10, chưa app nào có). `true` chạy tính năng như đã xem ad; `false` ở lại màn + toast `cannot_fetch_ads`
+    ("Can't fetch ads"; A013 có sẵn string này kèm bản dịch nhưng không dùng). Ref khác: A047 báo lỗi, không chạy;
+    A045 chạy luôn (Q53).
+  - Đóng ad trước khi nhận thưởng: ở lại màn.
+  - 4 nút làm lại ở màn kết quả không dùng reward mà dùng inter `inter_replace_reward` (MO-82).
 - **Bẫy**:
   - Chỉ đếm khi `earned` = true. Đóng sớm thì không tính.
   - N lớn làm UX tệ, cần MO chốt mức.

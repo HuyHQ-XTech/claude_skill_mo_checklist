@@ -7,6 +7,8 @@ Mục: MO-4, MO-68, MO-69, MO-70, MO-71, MO-72, MO-73, MO-75, MO-87, MO-88, MO-8
 > - Doc này **không chép code**. Khi làm, mở **bản hiện tại** của file/symbol được nêu ở A013. Định vị nhanh: `scripts/audit.py --item <ID> --app a013`.
 > - Repo A013 có skill riêng `.claude/skills/notifications/` (SKILL.md, references/gotchas.md, references/recipes.md). Đọc thêm nếu có repo, nhưng vài chỗ đã cũ so với code (ghi ở cuối "Luật cứng").
 > - Copy noti từng app: `assets/noti-content.md`. Đây là bản tham khảo; copy trong ticket MO được ưu tiên.
+> - MO có thể vẽ noti riêng cho app (A049: section *MO Checklist* trong Figma của app, đích ghi bằng chữ "Vào …" dưới mỗi frame). Có frame riêng thì UI, copy và đích theo frame đó, kể cả khi lệch recipe (A049: pinned không có hàng nút, click-ads về Horoscopes; user chốt "xem figma"). Ghi chỗ lệch recipe vào báo cáo.
+> - Ngoài **Chuẩn A013**, recipe ghi thêm **Ref A047 khác A013** (dùng khi user chọn ref A047) và **App đã làm — A049** (tiền lệ, không phải chuẩn). Ref A047 thì làm giống A047; phần A049 bổ sung so với A047 chỉ làm khi user đồng ý (SKILL.md bước 2).
 > - QC chung (đổi giờ, dark mode, quyền, Xiaomi): `references/qc.md` §3.
 
 ## Tổng quan nhóm
@@ -100,6 +102,9 @@ Action string của A013 có tiền tố cứng `com.example.a013_recovery.actio
   - Layout kill-app để TextView title/subtitle **không có textColor**.
   - Pinned là card trắng cố định (`bg_nofification`) với chữ `@color/black`: đọc được ở cả 2 chế độ nhưng không đổi theo chế độ.
 - **Nút CTA có vệt sáng quét ngang.** Dùng `ProgressBar` indeterminate có `indeterminateDrawable` là animation-list (`shimmer_indeterminate`, bản nhỏ `shimmer_indeterminate_small`) phủ lên nút, bo góc bằng `clipToOutline`. Đây là cách duy nhất có animation trong RemoteViews.
+- **Tên resource đừng trùng resource noti của xtechads.** AAR xtechads (kiểm 1.8.7) có sẵn layout `layout_noti_{daily,killapp,pin,reminder,winback}_{collapse,expand}`, màu `noti_title`, `noti_body`, `noti_divider`, `noti_blue`…, drawable `bg_noti_tile`, `bg_noti_thumb`, `noti_shimmer`, `noti_clip8`, `shimmer_indeterminate`…
+  - Trùng tên thì resource của app đè bản của SDK lúc merge, không báo lỗi. Hiện vô hại vì chưa app nào dùng `BaseNotificationManager` (§9), nhưng app mới nên đặt tên riêng.
+  - A013 (`layout_noti_reminder_*`, `layout_noti_winback_*`, `noti_divider`, `noti_shimmer`…) và A047 (`layout_noti_daily_*`, `bg_noti_tile`, `noti_divider`…) đang trùng. A049 không trùng tên resource noti nào (`layout_noti_daily_reading_*`, `noti_line`, `bg_noti_feature_tile`).
 
 ### 7. Deep link quay về qua Splash (MO-78)
 
@@ -118,6 +123,9 @@ Action string của A013 có tiền tố cứng `com.example.a013_recovery.actio
 - **Điều hướng tới tính năng.** `HomeScreen` (LaunchedEffect đầu) đọc `prefs.openTo`, điều hướng tới tính năng, rồi reset về `OPEN_TO_DEFAULT`.
 - **App đang mở sẵn.** `MainActivity.onNewIntent` nhận extras có `KEY_OPEN_FROM` thì khởi động lại `MainActivity` với `CLEAR_TASK`. Lý do: `recreate()` khôi phục backstack Nav3 và bỏ qua Splash.
 - **Từ lock screen.** `LockScreenActivity` mở app kèm `prefs.openTo` + `prefs.openFromPending` để dự phòng mất extras. Khi extras không có `KEY_OPEN_FROM`, `trackAppOpenFrom` đọc `openFromPending`.
+- **Mở lại từ Recents.** `MainActivity` đã `finish` (back, Exit) mà user mở lại từ Recents thì hệ thống start lại bằng intent gốc của task (có thể là intent của noti đã bấm), kèm cờ `FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY`.
+  - Có cờ này thì bỏ qua extras (A047, A049 `MainActivity.initArgs`). Không bỏ thì app log lại `app_open_from` của noti cũ và mở lại tính năng cũ.
+  - A013 (`initArgs`, `trackAppOpenFrom`) chưa kiểm cờ này.
 
 ### 8. Tracking `app_open_from`
 
@@ -125,7 +133,7 @@ Action string của A013 có tiền tố cứng `com.example.a013_recovery.actio
   - `notification_daily`, `notification_pinned`, `notification_kill`, `notification_reminder`, `notification_winback`;
   - `notification_lock_screen` hoặc `notification_lock_screen_un_support` (tuỳ `canUseFullScreenIntent()` lúc mở);
   - `widget`, `shortcut_<tính năng>`.
-- **App khác dùng biến thể:** `notification_win_back`, `notification_shortcut`, `notification_click_ads`, `notification_lockscreen`, `open_from_notification_*`, `lockscreen`. A045, A047 và a044 còn có thêm event `notification_clicked` (param loại noti). App đã phát hành thì giữ giá trị đang có (conventions.md §1); app mới theo A013.
+- **App khác dùng biến thể:** `notification_win_back`, `notification_shortcut`, `notification_click_ads`, `notification_lockscreen`, `open_from_notification_*`, `lockscreen`. A045, A047, a044 và A049 còn có thêm event `notification_clicked` (param loại noti). App đã phát hành thì giữ giá trị đang có (conventions.md §1); app mới theo A013.
 - A013 không log event "đã hiện noti", trừ `notification_lockscreen_un_support`. `xtechads/docs/TRACKING_EVENTS_STATUS.md` xếp event notification vào nhóm cố ý bỏ qua.
 
 ### 9. Dùng SDK hay manager tầng app?
@@ -206,6 +214,7 @@ Gom từ skill notifications của A013 (SKILL.md, gotchas.md), docs A047 (`docs
     - Daily/win-back dùng `app.getString`. Process dậy bởi alarm chưa qua `MainActivity`, nên có thể ra ngôn ngữ máy.
 14. **Noti kiểu kill-app/promo không bắn khi:**
     - ad full-screen đang hiện (`isShowingAds`);
+    - vừa bấm ad (`disableAdResumeOneTime`, A047, A049; xem Bẫy MO-70);
     - app tự mở Settings/app khác (MO-88);
     - đang đổi cấu hình (`isChangingConfigurations`, A047).
     - Ngoài ra phải huỷ noti kill-app ở `onResume`.
@@ -214,6 +223,10 @@ Gom từ skill notifications của A013 (SKILL.md, gotchas.md), docs A047 (`docs
 17. **Noti ongoing:** từ Android 14 user vuốt xoá được, trừ khi máy đang khoá hoặc user bấm "Xoá tất cả". Vì vậy pinned phải được đăng lại mỗi lần mở app.
 18. **Preload ad khi bắn noti** (A014/A047/A045 `preloadInterSplashOnNoti`) chỉ làm khi app đang foreground và ở main thread. Không resolve AdsManager trong receiver chạy nền. A045 hiện gọi từ nền (có thể kéo `ensureAdsInitialized()`), đừng chép.
 19. **Helper "bắn sau 30 giây" để debug phải xoá trước khi release.** Không đặt nó trong hàm `schedule*` tự lặp, vì nó sẽ lặp mãi (A013 gotchas).
+20. **Nút trong custom view không ăn `autoCancel`.** `setAutoCancel(true)` chỉ huỷ noti khi bấm vào thân noti (content intent). Bấm nút/tile gắn bằng `setOnClickPendingIntent` thì app mở nhưng noti vẫn nằm lại.
+    - Mở app bằng noti nào thì huỷ noti đó ở lượt mở: A049 `NotificationManager.cancelOpenedFrom`, gọi trong `MainActivity.initArgs` (daily, win-back, shortcut, click-ads). Pinned không huỷ; kill-app và lock screen đã huỷ ở `onResume`.
+    - A013 (nút CTA của reminder, win-back) và A047 chưa làm.
+21. **Noti dùng custom view vẫn set `setContentTitle`/`setContentText`** làm chữ dự phòng. Thiếu thì khi noti bị gộp nhóm, shade hiện "Expand to view" (A049, 10/2026). A013 (pinned, kill-app, reminder, win-back) và A047 (mọi noti custom view) chưa set.
 
 **Chỗ skill notifications của A013 đã cũ so với code `f784827`:**
 - Reminder không còn bắn ở Splash; nay bắn ở Language FO và Home (MO-72).
@@ -275,11 +288,16 @@ Gom từ skill notifications của A013 (SKILL.md, gotchas.md), docs A047 (`docs
      - `BootReceiver`.
   4. **Routing và tracking.** Route các `OPEN_TO` mới ở chỗ app xử lý sau Splash (A013: `HomeScreen`, LaunchedEffect đọc `prefs.openTo`). Thêm giá trị vào `MainActivity.trackAppOpenFrom`.
   5. **App XML/Fragment** (a031, a033): đăng pinned ở Activity/Fragment Splash sau bước quyền; route bằng `startActivity`/NavController. **App không SDK** (a028, a036, a041): làm y hệt, vì noti không phụ thuộc SDK ads.
+  - **App đã làm — A049** (port A047, 10/2026): `NotificationManager.showPinnedNotification`; tile là enum `PinnedNotiTile` (đích, nhãn, icon), request code `CODE_PINNED + index`.
+    - Gọi ở `SplashViewModel.onNotificationAnswered` (mỗi lần mở app, sau bước quyền), `HomeViewModel.onNotificationAnswered` (cấp quyền ở Home), `BootReceiver` (chỉ `BOOT_COMPLETED`).
+    - Layout theo frame Figma của app: title, body, 4 tile, không có hàng nút.
 - **Bẫy:**
   - Android 14+: user **vuốt xoá được** noti ongoing (Luật 17). QC đừng báo bug "vuốt được" trên máy 14+.
   - Giữ channel LOW. Nâng lên HIGH thì pinned sẽ kêu/heads-up mỗi lần mở app.
   - Collapse chỉ đủ chỗ cho icon; nhãn để ở expand.
   - Nút "Later" trên noti ongoing không có nghĩa "xoá", nên a016 bỏ nó. Ticket đòi có Later thì chốt hành vi với MO.
+  - Ảnh tile dạng bitmap (webp/png) không đổi màu theo dark mode. Muốn đổi thì dùng vector có `fillColor` trỏ màu `noti_*` có bản `values-night` (A049 `ic_noti_tile_*` + `noti_tile_content`).
+  - A049 tắt badge riêng channel pinned (`setShowBadge(false)` trong `createChannel`): noti ongoing không nên tính vào chấm thông báo trên icon app. A013, A047 để `true` cho mọi channel.
 - **QC:**
   - Mở app → kéo shade thấy pinned, không kêu. Expand xem đủ nội dung.
   - Bấm từng tile/nút → Splash (ads) → đúng tính năng; `app_open_from` = `notification_pinned`.
@@ -311,12 +329,12 @@ Gom từ skill notifications của A013 (SKILL.md, gotchas.md), docs A047 (`docs
     - `!AppScreenState.openSetting` (MO-88).
   - **Huỷ** ở `MainActivity.onResume`: `cancelNotification(KILL_APP_NOTIFICATION_ID)`.
   - **A013 thiếu** RC "show all" mà sheet yêu cầu.
-- **Remote config:** A013 chưa có, và rà 16 repo **không app nào** có key "FO hay mọi phiên".
-  - Đề xuất key mới `noti_kill_app_show_all` (Boolean, default `false`): `false` = chỉ bắn trong FO; `true` = bắn ở mọi lần app xuống nền. Tên cần MO chốt.
+- **Remote config:** A013 chưa có, và rà 16 repo **không app nào** có key "FO hay mọi phiên". A049 từng có field `kill_app.show_all` (Boolean, false) trong JSON `noti_config`; user bỏ ngày 15/10/2026 vì chưa app nào có RC này.
+  - Đề xuất key mới `noti_kill_app_show_all` (Boolean, default `false`): `false` = chỉ bắn trong FO; `true` = bắn ở mọi lần app xuống nền. Chỉ thêm khi MO chốt tên và user yêu cầu (Luật cứng 10, Q21).
   - Kill-switch đang có ở A045, A047, a044 là chuyện khác: `enable_noti_kill_app` (Boolean, true) chỉ bật/tắt hẳn noti.
 - **Hiện trạng các app:**
   - Chỉ FO: A013, a016, a031 (bắn ở `onDestroy`), a036, a037, a039, a041, Langofy, a033 (chỉ khi `FirstOpenActivity` đang hiện).
-  - **Mọi phiên** (lệch chuẩn mới): A014 (debounce 300 ms), a27, A028, a034, a044, A045, A047.
+  - **Mọi phiên** (lệch chuẩn mới): A014 (debounce 300 ms), a27, A028, a034, a044, A045, A047, A048, A049 (từ 15/10/2026, user chốt ref A047 sau bug "ở Home kill / minimize không có noti").
 - **Placement / tracking:**
   - Channel `recovery_channel_kill_app1` (HIGH), id `KILL_APP_NOTIFICATION_ID`.
   - Extras: `OPEN_FROM_KILL_NOTIFICATION`.
@@ -325,15 +343,22 @@ Gom từ skill notifications của A013 (SKILL.md, gotchas.md), docs A047 (`docs
   1. **Layout.** Dựng theo Figma `525-20`, copy lấy ở `assets/noti-content.md` mục MO-69. Set text bằng `setTextViewText`, đừng để text tĩnh trong XML. Màu dùng `noti_*`.
   2. **Hàm `setKillAppNotification`:** đồng bộ, có gate quyền, PendingIntent với request code riêng.
   3. **Trigger** ở `MainActivity.onPause` (như A013) hoặc `onStop` (như A045, để tránh dialog quyền hệ thống làm Activity pause). Điều kiện:
-     - (đang FO **hoặc** `noti_kill_app_show_all` = true);
+     - đang FO (app có key `noti_kill_app_show_all` thì thêm: **hoặc** key = true);
      - và không đang hiện ad (`!isShowingAds`);
      - và không có cờ "app tự mở Settings/app khác" (MO-88);
+     - và không vừa bấm ad (`disableAdResumeOneTime`), bắt buộc khi app có noti click-ads riêng (MO-70);
      - và không `isChangingConfigurations`.
   4. **Huỷ** noti ở `onResume`. Thêm `notification_kill` vào `trackAppOpenFrom`.
   5. Đọc `MainActivity.onPause/onResume` và `NotificationManager.setKillAppNotification` ở A013 (bản hiện tại).
   6. **App XML/Fragment:** đặt cùng chỗ (`onPause`/`onStop` của Activity chính). **App không SDK** (a028, a036, a041): cờ "đang hiện ad" lấy từ lớp ads tự viết của app.
+  - **Ref A047 khác A013:** bắn ở `MainActivity.onPause` ở mọi phiên, chỉ có kill-switch `enable_noti_kill_app`. Bỏ lượt khi `isChangingConfigurations`, `isShowingAds` hoặc `disableAdResumeOneTime`.
+  - **App đã làm — A049** (port A047, 10/2026):
+    - Trigger ở `MainActivity.onStop`, vì dialog quyền hệ thống chỉ làm Activity pause.
+    - Bỏ lượt khi `isChangingConfigurations`, `isAdOnScreen` (gồm `isShowingAds`, `isShowingAdResume`, `showLoadingDialog`), `disableAdResumeOneTime` (vừa bấm ad, MO-70) hoặc `ExternalScreen.opening` (MO-88).
+    - `NotificationManager.showKillAppNotification` chỉ kiểm kill-switch `noti_config.kill_app.enable` như A047, bắn mọi phiên. Huỷ noti ở `onResume`.
+    - Bản trước có gate FO trong hàm này, nên QC báo bug "ở Home kill / minimize không có noti kill app". Ngày 15/10/2026 user chốt noti theo A047 và bỏ gate FO.
 - **Bẫy:**
-  - `onPause` còn chạy khi dialog quyền hoặc sheet hệ thống phủ lên, khi multi-window, khi đổi cấu hình → bắn nhầm. A045 chuyển sang `onStop`; A047 chặn `isChangingConfigurations`.
+  - `onPause` còn chạy khi dialog quyền hoặc sheet hệ thống phủ lên, khi multi-window, khi đổi cấu hình → bắn nhầm. A045, A048 và A049 chuyển sang `onStop`; A047 chặn `isChangingConfigurations`.
   - Request code content intent của A013 (`41999331`) trùng với daily (Luật 10).
   - A013 dùng lại noti này cho click-ads (MO-70), nên `onResume` cũng huỷ luôn noti click-ads.
   - Nhiều app **không huỷ** noti ở `onResume` (a016, a036, a037, a039, a041). User quay lại app mà noti vẫn nằm đó.
@@ -344,7 +369,7 @@ Gom từ skill notifications của A013 (SKILL.md, gotchas.md), docs A047 (`docs
   - Mở lại app → noti mất.
   - Trong lúc ad full-screen hiện, bấm Home → không có noti.
   - Popup mất mạng → "Enable" → Settings → không có noti (MO-88).
-  - Sau khi vào Home (hết FO), thoát → không có noti. Bật `noti_kill_app_show_all` → có (RC áp từ lần mở sau, `references/qc.md` §1).
+  - Sau khi vào Home (hết FO), thoát → không có noti. App có key `noti_kill_app_show_all` thì bật lên → có (RC áp từ lần mở sau, `references/qc.md` §1).
   - Kiểm dark/light.
 
 ## MO-70 — Noti clicked ads
@@ -369,7 +394,7 @@ Gom từ skill notifications của A013 (SKILL.md, gotchas.md), docs A047 (`docs
 - **Hiện trạng các app** (mọi app đều bắn **ngay lúc click**, không app nào đợi app xuống nền):
   - Dùng lại noti kill-app: A013, a016, a27, a034.
   - Cùng layout kill-app nhưng `OPEN_FROM` riêng: a037, a039.
-  - Có noti riêng: A014 `setClickAdsNotification`; a033 `setClickAdsNotification`; a036 `showClickAdsNotification`; a041 `setClickedAdsNotification`; Langofy `setClickAdsNotification`; a044, A045 và A047 `showClickAdsNotification`. A047 còn lưu backstack lúc bấm ad vào pref `click_ads_stack` để mở lại đúng màn.
+  - Có noti riêng: A014 `setClickAdsNotification`; a033 `setClickAdsNotification`; a036 `showClickAdsNotification`; a041 `setClickedAdsNotification`; Langofy `setClickAdsNotification`; a044, A045, A047 và A049 `showClickAdsNotification`. A047 còn lưu backstack lúc bấm ad vào pref `click_ads_stack` để mở lại đúng màn.
   - Chỉ toast: A028, a031.
 - **Placement / tracking:**
   - A013 không phân biệt được với kill-app, vì cả hai cùng `OPEN_FROM_KILL_NOTIFICATION` → `app_open_from` = `notification_kill`.
@@ -383,14 +408,22 @@ Gom từ skill notifications của A013 (SKILL.md, gotchas.md), docs A047 (`docs
      - Nên có hàm riêng: id riêng, `OPEN_FROM_*CLICK_ADS*`, `app_open_from` = `notification_click_ads`, copy MO-70 trong `assets/noti-content.md`. Tham khảo `setClickAdsNotification` của A014 hoặc `showClickAdsNotification` của A047.
   4. Đọc khối `clickedAnyAds` trong `AppNavigation.kt` ở A013 (bản hiện tại).
   5. **App không SDK** (a028, a036, a041): không có `BaseAds.clickedAnyAds`; tìm callback click trong lớp ads tự viết. a036 dùng RC `click_ads_type`.
+  - **Ref A047 khác A013:** noti riêng `NotificationManager.showClickAdsNotification` (id riêng, `OPEN_FROM_NOTIFICATION_CLICK_ADS`); hook ở `ads/AdsEffects.kt` `ClickAdsEffect`, gắn trong navigation. Lúc bấm ad lưu backstack vào `click_ads_stack`; noti mở với `OPEN_TO_LAST_SCREEN`, rồi `SplashViewModel.restoreClickAdsStack` dựng lại đúng màn.
+  - **App đã làm — A049** (port A047, 10/2026): như A047, nhưng đích theo frame Figma của app (Horoscopes); hạ tầng `click_ads_stack` vẫn giữ. Hook gán trong `DisposableEffect(backStack)`; lúc dispose chỉ gỡ khi `clickedAnyAds` còn là lambda của mình. Default `click_ad_action` trong code là `"notification"`.
 - **Bẫy:**
   - Bấm ad thường mở trình duyệt/Store → app xuống nền. Ở A013 trong FO, kill-app cũng bắn, nhưng cùng id nên chỉ còn 1 noti.
+  - **Có noti click-ads riêng (khác id kill-app) thì trigger kill-app phải bỏ lượt ngay sau khi bấm ad**, nếu không bấm ad trong FO sẽ ra 2 noti. SDK `BaseAds.onAdClicked` set `disableAdResumeOneTime` trước khi gọi `clickedAnyAds`; A047, A049 kiểm cờ này ở trigger kill-app.
   - Noti cùng id kill-app bị huỷ ở `MainActivity.onResume`, tức là biến mất khi user quay lại app.
+  - RC = `notification` mà chưa có quyền `POST_NOTIFICATIONS` thì không hiện gì, cũng không toast: A013
+    `setKillAppNotification` (gate `allowNotification`), A047/A049 `NotificationManager.showPromo` (gate
+    `canPost`) đều return sớm. Có fallback toast hay không: open-questions Q51.
   - Default trong code (`toast`) khác giá trị trên Firebase → QC phải biết giá trị RC thật (`references/qc.md` §1).
+  - Đích khi tap noti lệch giữa các app: Home (A013, dùng lại kill-app), màn đang đứng lúc bấm ad (A047 `OPEN_TO_LAST_SCREEN`), tính năng theo Figma (A049 Horoscopes). Ticket/Figma không ghi đích thì theo ref và báo trong báo cáo (open-questions Q43).
 - **QC:**
   - RC = `notification`: bấm native, banner, inter… lần lượt → mỗi lần có noti. Tap → Splash → app.
   - RC = `toast` → chỉ toast.
   - Quay lại app → noti (dùng chung id kill-app) mất.
+  - App có noti riêng (A047, A049): bấm ad trong FO → chỉ có noti click-ads, không kèm kill-app. Quay lại app từ Recents thì noti click-ads vẫn còn (`onResume` chỉ huỷ kill-app và lock screen); mở app bằng chính noti thì noti mất (A049, Luật 20).
   - Kiểm dark/light.
 
 ## MO-71 — Noti daily
@@ -426,12 +459,18 @@ Gom từ skill notifications của A013 (SKILL.md, gotchas.md), docs A047 (`docs
   3. **Nhánh trong receiver:** chọn content → post (glyph icon, auto-cancel, context bọc locale) → hẹn lại. Có việc async thì dùng `goAsync()`.
   4. **Hẹn ở 3 chỗ:** Splash sau bước quyền, `BootReceiver` (+ `TIME_SET`/`TIMEZONE_CHANGED`), và ngay sau mỗi lần bắn. Muốn chống mất slot thì thêm cửa sổ ân hạn kiểu A047 (Luật 8).
   5. Đọc `NotificationManager.scheduleReminder` / `setNotification` và nhánh cuối của `NotificationReceiver.onReceive` ở A013 (bản hiện tại).
+  - **Ref A047 khác A013** (A049 giữ nguyên):
+    - action riêng `ACTION_SHOW_DAILY`, mỗi giờ một request code (`CODE_DAILY_MORNING`, `CODE_DAILY_EVENING`) kèm extra `EXTRA_ALARM_KEY`;
+    - receiver (`goAsync`) gọi `markAlarmFired` → `showDailyNotification` → `scheduleDaily`; `scheduleAt` có cửa sổ ân hạn 2h (Luật 8);
+    - RC tắt daily thì `scheduleDaily` huỷ cả 2 alarm, không chỉ bỏ qua lúc bắn;
+    - noti dùng custom view, nút CTA ở bản expand, auto-cancel, glyph `ic_noti_small`.
 - **Bẫy:**
   - Đừng nhầm `scheduleReminder` (daily) với `showReminderNotification` (MO-72).
   - Alarm trễ tới khoảng 1 giờ khi máy Doze.
   - Force-stop xoá alarm; phải mở app lại thì alarm mới được hẹn lại.
 - **QC:**
-  - Ép nổ ngay (build debug): `adb shell run-as $P am broadcast --user 0 -n $P/<FQCN NotificationReceiver>`, không kèm `-a` (cách của A047, đã verify trên Android 15). A013: `$P` = `com.recovery.protect.data`, FQCN = `com.example.a013_recovery.domain.notification.NotificationReceiver`.
+  - Ép nổ ngay (build debug): `adb shell run-as $P am broadcast --user 0 -n $P/<FQCN NotificationReceiver>` (cách của A047, đã verify trên Android 15). A013 không kèm `-a` (daily là nhánh không action): `$P` = `com.recovery.protect.data`, FQCN = `com.example.a013_recovery.domain.notification.NotificationReceiver`.
+  - App có action daily riêng (A047, A049): thêm `-a` = giá trị hằng `NotificationManager.ACTION_SHOW_DAILY`. Hai app này đặt tiền tố action theo namespace, không theo applicationId (ở A047 hai giá trị này khác nhau).
   - Hoặc đổi giờ: mở app 1 lần → `cmd alarm set-time` tới 8:00 + 1h05m, giữ màn sáng (`references/qc.md` §3).
   - `adb shell dumpsys alarm | grep -A4 $P` thấy alarm kế.
   - Kiểm dark/light.
@@ -470,6 +509,7 @@ Gom từ skill notifications của A013 (SKILL.md, gotchas.md), docs A047 (`docs
 - **Placement / tracking:**
   - Channel `recovery_channel_reminder`, id `REMINDER_NOTIFICATION_ID`, request code riêng cho nút mở và nút LATER.
   - `app_open_from` = `notification_reminder` (biến thể `notification_shortcut`).
+  - A049 log `shortcut` theo danh sách PO, trùng giá trị với lượt mở từ launcher shortcut (`ShortcutsUtil`). Phân biệt bằng event `notification_clicked` (`type` = `shortcut`).
 - **Cách làm:**
   1. **Layout:** collapse (title + body) và expand (title, body, divider bằng `ImageView` 1dp, hàng LATER | ACTION). Màu `noti_*`. Copy lấy ở `assets/noti-content.md` mục MO-72 (mới).
   2. **Hàm show:**
@@ -479,8 +519,15 @@ Gom từ skill notifications của A013 (SKILL.md, gotchas.md), docs A047 (`docs
   3. **FO:** ở `LifecycleResumeEffect` của màn Language FO (XML: `onResume` của Fragment/Activity) → bắn 1 lần, ghi cờ FO và cả session hiện tại, để Home trong cùng phiên FO không bắn thêm (A047 làm vậy).
   4. **User cũ:** ở resume của Home → so `sessionNumber` với session đã bắn.
   5. Đọc `LanguageFOScreen` (khối `hadPostNotificationRemind`), `HomeScreen` (khối `lastReminderSession`) và `NotificationManager.showReminderNotification` ở A013 (bản hiện tại).
+  - **Ref A047 khác A013:**
+    - `NotificationManager.showShortcutNotiOnLanguage` (gọi ở resume màn Language FO) ghi `shown_shortcut_noti_fo` và `last_shortcut_noti_session`;
+    - `showShortcutNotiOnHome` so `last_shortcut_noti_session` với `sessionNumber`; Home bỏ qua khi `passingThrough`;
+    - LATER = broadcast `ACTION_DISMISS_SHORTCUT` tới receiver.
+  - **App đã làm — A049** (port A047, 10/2026): như A047, thêm kiểm kill-switch + quyền (`canShowShortcut`) **trước** khi ghi cờ, ở cả Language lẫn Home. Language chỉ bắn khi không mở từ Settings (`LanguageViewModel.onResume` kiểm `fromSetting`).
 - **Bẫy:**
-  - A013 set `hadPostNotificationRemind = true` kể cả khi chưa có quyền noti. Nếu RC `noti_permission_trigger` = `home` (chưa xin quyền trước Language) thì lượt FO bị mất. Chỉ ghi cờ khi `allowNotification`.
+  - A013 set `hadPostNotificationRemind = true` kể cả khi chưa có quyền noti. Nếu RC `noti_permission_trigger` = `home` (chưa xin quyền trước Language) thì lượt FO bị mất. Chỉ ghi cờ khi `allowNotification`. A047 cũng ghi cờ trước khi kiểm quyền; A049 đã sửa.
+  - Chỉ ghi cờ FO khi có quyền, mà app dùng chung một màn Language cho FO và Settings (A049; A013, A047 có màn Settings riêng), thì phải chặn lượt vào Language từ Settings. Nếu không, user cấp quyền muộn sẽ nhận noti "FO" lúc đổi ngôn ngữ ở Settings.
+  - `sessionNumber` chỉ được tăng khi `savedInstanceState == null` (A013, A047, A049). Tăng cả khi Activity dựng lại (đổi dark mode, ngôn ngữ) thì shortcut bắn lại trong cùng phiên.
   - Mở app từ noti thẳng vào tính năng thì Home chỉ là trạm trung chuyển. A013 vẫn bắn ở resume Home; A047 chặn bằng `passingThrough`.
   - a016/a036 thêm điều kiện `!adsManager.isShowingAds` khi bắn ở Language.
   - Đừng nhầm với `scheduleReminder` (đó là daily).
@@ -488,6 +535,7 @@ Gom từ skill notifications của A013 (SKILL.md, gotchas.md), docs A047 (`docs
   - Xoá data → FO tới Language → có noti. Back/vào lại → không bắn lại.
   - Expand → LATER → noti mất. Bắn lại, bấm ACTION → Splash → màn đích; `app_open_from` = `notification_reminder`.
   - Kill app → mở lại → vào Home → có noti. Vào tính năng rồi về Home → không bắn lại.
+  - App có `passingThrough` (A047, A049): mở từ noti thẳng vào tính năng thì lúc đi qua Home không có noti shortcut; back về Home mới bắn nếu phiên chưa bắn.
   - Kiểm dark/light.
 
 ## MO-73 — Win-back noti
@@ -526,12 +574,13 @@ Gom từ skill notifications của A013 (SKILL.md, gotchas.md), docs A047 (`docs
   3. **Receiver:** nhánh show + hẹn lại, chạy đồng bộ.
   4. **Hẹn ở:** Splash, Boot, và sau mỗi lần bắn.
   5. Đọc `NotificationManager.scheduleWinBack` / `scheduleWinBackAt` / `showWinBackNotification` và nhánh `ACTION_SHOW_WINBACK` của `NotificationReceiver` ở A013 (bản hiện tại).
+  - **Ref A047 khác A013** (A049 giữ nguyên): hạ tầng như MO-71 (mỗi giờ một request code, `markAlarmFired` trước khi bắn, ân hạn 2h, RC tắt thì huỷ alarm). Dùng chung layout promo với kill-app/click-ads (`layout_noti_promo_*`); win-back gọi `showPromo` với `actionInCollapsed = false` nên collapse hiện thumbnail thay nút CTA.
 - **Bẫy:**
   - Luật 8 đặc biệt hay gặp: mở app lúc 11:10 khi alarm 11:00 chưa nổ → bị đẩy sang mai.
   - `showWinBackNotification` của A013 gọi `setImageViewResource(R.id.ivBig, …)` lên layout collapse, mà layout này không có id đó. Lệnh này vô hại (bị bỏ qua), nhưng đừng chép.
   - Win-back và daily dùng chung một receiver → phải tách action (Luật 6).
 - **QC:**
-  - Ép nổ (debug): `adb shell run-as $P am broadcast --user 0 -n $P/<FQCN receiver> -a <action win-back>` (A013: `com.example.a013_recovery.action.SHOW_WINBACK`).
+  - Ép nổ (debug): `adb shell run-as $P am broadcast --user 0 -n $P/<FQCN receiver> -a <action win-back>` (A013: `com.example.a013_recovery.action.SHOW_WINBACK`; A047, A049: hằng `NotificationManager.ACTION_SHOW_WINBACK`, tiền tố theo namespace).
   - Hoặc đổi giờ tới 11:00 + 1h05m và 14:00 + 1h05m.
   - Collapse có thumb; expand có ảnh + nút. CTA → Splash → tính năng; `app_open_from` = `notification_winback`.
   - Kiểm dark/light. Ngày kế vẫn bắn.
@@ -623,8 +672,12 @@ Gom từ skill notifications của A013 (SKILL.md, gotchas.md), docs A047 (`docs
   3. Reset cờ ở `onResume`.
   4. Áp cho **mọi** chỗ app chủ động mở Settings trong FO (mạng, quyền noti, quyền file…), không chỉ Wi-Fi.
   5. Đọc `openInternetSettings` (`utils/AppUtils.kt`) và `MainActivity.onPause/onResume` ở A013 (bản hiện tại).
+  - **App đã làm — A049** (10/2026):
+    - cờ riêng `common/ExternalScreen.kt` (`ExternalScreen.opening`), set trong helper chung `startExternal` (`common/Commons.kt`; mọi lệnh mở URL, Store, share, App info) và trong `PermissionSettingsGuide.open`; reset ở `MainActivity.onResume`;
+    - trigger kill-app ở `onStop` kiểm cả cờ này lẫn `disableAdResumeOneTime`;
+    - popup mất mạng gọi `MainActivity.openInternetSettings`: set cờ SDK (`disableAdResumeOnTime`) rồi mở trang Wi-Fi toàn màn hình qua `PermissionSettingsGuide.open` (set luôn cờ riêng, có mạng thì tự kéo app về). Tới 15/10/2026 popup gọi `openWifiSetting` của SDK (`references/splash.md` MO-26).
 - **Hiện trạng các app** (cờ dùng: `AppScreenState.openSetting` hoặc `adsManager.disableAdResumeOneTime`; SDK tự xoá cờ sau khi app quay lại từ nền):
-  - Đã có: A013, A014 (commit `c5c2db1` "Checklist MO 88 + 90"), a033, a036, a037, a039, a044, A047, a27.
+  - Đã có: A013, A014 (commit `c5c2db1` "Checklist MO 88 + 90"), a033, a036, a037, a039, a044, A047, a27, A049 (cờ riêng `ExternalScreen.opening` + cờ SDK).
   - a031 không áp dụng (kill-app bắn ở `onDestroy`).
   - **Chưa có:** a016 (`NetworkUtils.openNetworkSettings`), A028 (`openWifiSetting`), a041 (`openNetworkSettings`).
   - **Thiếu một phần:**
@@ -642,6 +695,8 @@ Gom từ skill notifications của A013 (SKILL.md, gotchas.md), docs A047 (`docs
     - Cờ riêng reset ở `MainActivity.onResume` (A013) an toàn hơn.
   - A013 chỉ set cờ trong `openInternetSettings`. Các chỗ mở Settings khác trong FO (nếu app có) phải tự set.
   - Lỡ quên reset cờ thì kill-app tắt luôn tới lần resume sau.
+  - **Helper mở màn ngoài của SDK** (`openWifiSetting`, `openWebsite`, `shareApp`; kiểm 1.8.7) chỉ gọi `BaseAds.disableAdResumeOnTime` (set `disableAdResumeOneTime`), không biết cờ riêng của app. App có cờ riêng mà vẫn gọi helper SDK thì trigger kill-app phải kiểm cả hai cờ (trigger của A049 kiểm cả hai).
+  - Trigger kill-app ở `onStop` (A045, A048, A049) thì panel/sheet nổi (chỉ làm `onPause`) tự không bắn. Cờ vẫn cần cho Settings, Store, trình duyệt mở toàn màn hình.
 - **QC:**
   - Cài mới, tắt mạng (`svc wifi disable; svc data disable`) → Splash hiện popup → Enable → Settings → không có noti. Test cả máy Android 10+ (mở panel nổi) lẫn máy mở trang Settings toàn màn hình.
   - Bật mạng → app tự quay về.
@@ -766,13 +821,20 @@ Gom từ skill notifications của A013 (SKILL.md, gotchas.md), docs A047 (`docs
     - đã có quyền noti;
     - RC `full_scr_intent`;
     - đúng nhịp `full_scr_intent_retrigger`.
-- **Họ khác — A044/A045** (a044, A045, A047, a033):
-  - Logic nằm trong `NotificationManager` + class `LockScreenNotiWatcher` (a044, A047, a033). **A045 đã xoá watcher** (commit `6bb2f45`), nên A045 **không có rewake**, thiếu 1 dòng nghiệm thu. KDoc và `docs/features/mo-checklist-v103.md` của A045 vẫn nhắc watcher/`timeDelayNotiHide`: doc cũ, theo code.
+- **Họ khác — A044/A045** (a044, A045, A047, A049, a033):
+  - Logic nằm trong `NotificationManager` + class `LockScreenNotiWatcher` (a044, A047, A049, a033). **A045 đã xoá watcher** (commit `6bb2f45`), nên A045 **không có rewake**, thiếu 1 dòng nghiệm thu. KDoc và `docs/features/mo-checklist-v103.md` của A045 vẫn nhắc watcher/`timeDelayNotiHide`: doc cũ, theo code.
   - A013 dùng chung vài tên với họ này (action `…action.SHOW_LOCKSCREEN`, extra `lockscreen_noti_type`, id noti). Vì vậy nhận diện họ bằng **cấu trúc class**, không bằng tên action.
-  - Chỉ post khi màn tắt/khoá, không thì bỏ slot (A045, A047). Kill-switch rewake `enable_noti_lockscreen_rewake` có ở A047/a044 (A045 không có vì không có rewake).
+  - Chỉ post khi màn tắt/khoá, không thì bỏ slot (A045, A047, A049). Kill-switch rewake `enable_noti_lockscreen_rewake` có ở A047/a044, A049 là field `lockscreen.rewake` trong `noti_config` (A045 không có vì không có rewake).
   - A045 `parseTime` chỉ nhận `H:mm` (`"8:00 PM"` → 8:00, sai). A013 nhận cả `h:mm a`.
   - Mở noti: A045 `disableAdResumeOnTime` khi bấm CTA; huỷ noti ở `MainActivity.onResume`.
   - A045/A047 thêm cửa sổ ân hạn 2 giờ + mốc `noti_fired_day_<req>`, và không dùng wake lock.
+  - A047, A049 chỉ đăng ký `LockScreenNotiWatcher` ở nhánh lock screen của receiver; A013 đăng ký thêm ở `App`, Splash, Boot và `LockScreenActivity`. Process chết sau khi post thì mất rewake tới slot sau.
+  - **A047 thiếu so với nghiệm thu hoặc dính lỗi đã biết trong Bẫy; A049 (port A047, 10/2026) đã bổ sung** (ref A047 thì hỏi user trước khi bổ sung):
+    - biến thể un_support: A047 luôn mở với `OPEN_FROM_NOTIFICATION_LOCKSCREEN`, không có event. A049 chọn `open_from` theo `canUseFullScreenIntent()` lúc post (A013 tính lúc mở app) và log `notification_lockscreen_un_support` (param `type`);
+    - huỷ alarm của các chỉ số slot ≥ số slot hiện tại trong `scheduleLockScreen` (A047 chỉ huỷ khi RC tắt hẳn);
+    - parse slot `h:mm a` (A047 đọc `"8:00 PM"` thành 8:00, như A045);
+    - `replace` = true thì huỷ noti cũ rồi mới post. A047 post đè cùng id, trong khi comment ở `rewakeLockScreenNotification` của chính A047 ghi cập nhật cùng id không chắc bật lại FSI;
+    - gán `session_number` cho event ở overlay và event un_support (xem Bẫy).
   - Nhận diện bằng `detect.any`. Khi app đã theo họ này thì **giữ họ đó**, chỉ bổ sung phần thiếu.
 - **Remote config:** xem bảng `rc_keys` trong catalog. Key chuẩn A013 và ý nghĩa:
   - `noti_lockscreen_enable` (Boolean, true): bật/tắt cả schedule lẫn bắn.
@@ -795,9 +857,10 @@ Gom từ skill notifications của A013 (SKILL.md, gotchas.md), docs A047 (`docs
     - `fs_permission_allow` / `fs_permission_exit` / `fs_permission_back`.
   - Chú ý A013 lệch tên: event `notification_lockscreen…` nhưng giá trị `open_from` là `notification_lock_screen…`.
   - Biến thể ở app khác: `show_notification_lockscreen_<type>` (A014, a044, a033), `noti_lockscreen_click`, `open_from_notification_lockscreen`, `lockscreen`.
+  - A049 (theo `naming-rules.md` của skill build-tracking trong repo): `app_open_from` = `notification_lockscreen` (như A048) / `notification_lockscreen_un_support` (A048 không có giá trị này, chỉ có event), khớp tên event; `screen_show` `ScrNotificationLockScreen<N>` (N = thứ tự loại, 1..n, như A013, A048); nút `BtnClick` / `BtnNotiClose`. A047 dùng một tên màn `ScrNotificationLockScreen`, không có số.
 - **Cách làm** (họ A014 như A013, Compose-first):
   1. **Enum loại noti** (content, ảnh, `OPEN_TO`, `trackName`). Copy/ảnh do MO cấp; chưa có thì tham khảo chuỗi `noti_lockscreen_*` / `fs_permission_*` trong `res/values/strings.xml` của A013 (bản hiện tại) và đánh `TODO(mo)` (catalog MO-95 chưa có Figma/ảnh).
-  1b. **Thêm màn overlay vào `screenSkipAdResume`** (hoặc cơ chế tắt app-open resume tương đương của app).
+  1b. **Thêm màn overlay vào `screenSkipAdResume`** (hoặc cơ chế tắt app-open resume tương đương của app). A013 (map `LockScreenNotiType.entries` ngay trong `screenSkipAdResume`) và A049 (`LockScreenActivity.TRACKING_SCREENS`) sinh tên màn từ enum loại, nên thêm loại mới không phải sửa tay danh sách.
   2. **`object LockScreenNotiManager`** của app, gồm:
      - channel HIGH riêng;
      - getter RC (key ở trên);
@@ -830,7 +893,7 @@ Gom từ skill notifications của A013 (SKILL.md, gotchas.md), docs A047 (`docs
   7. **Tracking:** thêm `notification_lock_screen(_un_support)` vào `trackAppOpenFrom`; screen/button theo toolkit tracking của app.
   8. **App XML/Fragment** (a031, a033): Activity overlay có thể giữ Compose qua `setContent`, hoặc layout XML; logic manager giữ nguyên. a031 (qibla) có lock screen riêng theo giờ cầu nguyện (`PrayerScheduleLockscreenManager`, RC `time_push_noti_lockscr` JSON) và **gắn FSI không kiểm quyền** → phải thêm gate `canUseFullScreenIntent()`. a028/a036 chưa có tính năng này.
 - **Bẫy:**
-  - **`CATEGORY_ALARM`:** A013/A014/A045 set; A047 cố ý bỏ, vì category này xuyên chế độ Không làm phiền (noti quảng
+  - **`CATEGORY_ALARM`:** A013/A014/A045/A048 set; A047 cố ý bỏ (A049 theo A047), vì category này xuyên chế độ Không làm phiền (noti quảng
     bá kêu cả đêm, dùng sai mục đích category). **Mặc định của skill: KHÔNG set** (coi là lỗi đã biết của A013,
     `open-questions.md` Q22). App đang set thì báo trong báo cáo, hỏi user trước khi bỏ vì là đổi hành vi đã
     phát hành.
@@ -838,11 +901,21 @@ Gom từ skill notifications của A013 (SKILL.md, gotchas.md), docs A047 (`docs
   - **Watcher** là receiver runtime, chết theo process. Vì vậy phải đăng ký lại ở mọi điểm vào: App, receiver, Boot, Activity.
   - **Giảm số slot qua RC:** ở A013, alarm có chỉ số cao vẫn còn hẹn và bắn thêm 1 lần rồi mới hết. Đây là lỗi đã biết, **đừng chép**: khi schedule, huỷ alarm của các chỉ số ≥ số slot hiện tại.
   - **User mới theo pref `first_install_time`** (A013 ghi ở lần mở app đầu tiên): user cập nhật từ bản cũ chưa có pref sẽ bị coi là "mới" trong 24h đầu sau update. Chấp nhận được; app không có pref này thì dùng `PackageInfo.firstInstallTime`.
-  - **Định nghĩa "user mới" lệch giữa các app:** A013/A047/a044 tính cài < 24h; a016 dùng anchor < 24h; A014 dùng `first_open`; a041 dùng `firstOnboard`.
+  - QC khác nhau theo cách tính: A013 (pref ghi lúc mở đầu) thì `pm clear` là thành user mới; A047, A049
+    (`NotificationManager.isNewUser` đọc `PackageInfo.firstInstallTime`) thì `pm clear` lẫn `adb install -r` đều giữ
+    mốc cũ → muốn test `slots_new` phải gỡ app rồi cài lại.
+  - **Slot sai định dạng xử lý khác nhau giữa app, không báo lỗi:** A049 `parseTime` (kiểm 0..23 / 0..59) bỏ hẳn giờ
+    ngoài khoảng (`25:00`, `12:60`, `13 PM`) và dạng `H:mm:ss` → slot đó biến mất.
+    - a037 `parseSlotTime` khác: không qua kiểm 0..23 / 0..59 thì thử tiếp `SimpleDateFormat` (lenient), nên vẫn nhận
+      `H:mm:ss` và đổi giờ ngoài khoảng thành giờ khác (`25:00` thành 1:00, `12:60` thành 13:00; thử trên JVM). Slot
+      không biến mất mà lệch giờ.
+  - **Định nghĩa "user mới" lệch giữa các app:** A013/A047/a044 tính cài < 24h (A049 như A047); a016 dùng anchor < 24h; A014 dùng `first_open`; a041 dùng `firstOnboard`; A048 dùng `prefs.firstOpen` (`NotificationManager.isNewUser`).
   - **Default slot lệch giữa các app** (a016: `"11:00,15:00,18:00"`, a27/Langofy: `"9:00,15:00,18:00"`, A047 new: `"09:00,13:00,19:00"`). Giữ giá trị của app đang chạy.
   - **Mặc định `noti_lockscreen_replace`** là `true` ở a037, a039, A045, Langofy.
-  - **Hành vi khi user đang dùng máy:** A013 vẫn post heads-up (không FSI); A045/A047 bỏ hẳn lượt đó. Chốt theo MO khi port.
+  - **Hành vi khi user đang dùng máy:** A013 vẫn post heads-up (không FSI); A045/A047 bỏ hẳn lượt đó (A049 theo A047, `NotificationManager.isDeviceInUse`). Chốt theo MO khi port.
   - Mở app thì phải huỷ noti lock screen; nếu không, noti còn treo sẽ rewake mỗi lần bật màn.
+  - **Số slot tối đa = số loại noti** ở họ A045/A047: `lockScreenSlots` cắt bằng `take(LockScreenNotiType.entries.size)`. A049 có 3 loại, RC đặt 4 slot thì slot thứ 4 bị bỏ im lặng. Báo MO số slot tối đa của app.
+  - **`session_number` = 0 ở process do alarm đánh thức.** Process chưa chạy `MainActivity` nên `TrackingState.sessionNumber` của SDK còn 0; event ở overlay và event un_support mang số 0. Gán từ prefs ở `LockScreenActivity.onCreate` và ngay trước khi log (A049). A013, A047 chưa gán.
 - **QC** (gom từ skill `test-noti-lockscreen` và doc `docs/lockscreen-fsi-device-guide.md` của A014, cùng `references/qc.md` §3):
   - **Máy:**
     - Dùng máy thật; emulator không tin được (keyguard và ads gây nhiễu).
@@ -881,6 +954,7 @@ Gom từ skill notifications của A013 (SKILL.md, gotchas.md), docs A047 (`docs
     - Cài lại APK làm đổi uid và reset appops.
     - Nhảy giờ trên Xiaomi reset quyền FSI/10020; cấp lại trước mỗi lần đo.
     - HiOS/ColorOS có công tắc toàn cục "đánh thức màn hình khi có thông báo" đè lên cài đặt app.
+    - Rewake lúc bật màn chỉ chạy khi `isKeyguardLocked` (A013 `onScreenOn`, A049 `LockScreenNotiWatcher`): máy/emulator đặt khoá màn hình là None thì không test được (A049).
     - Xong thì trả giờ: `$S cmd alarm set-time $(( $(date +%s) * 1000 ))` + `$S settings put global auto_time 1`.
   - Skill `test-noti-lockscreen` của A014 grep log và stamp kiểu cũ (`shown_stamp`, `register: watching`). Đừng chép nguyên; đọc log thật của app đang test.
   - Tag log, channel, action, tên receiver ở trên là của A013. App khác dùng tên của app (họ A045 log ở tag `NotificationManager`; `$P` = applicationId; FQCN theo namespace).
