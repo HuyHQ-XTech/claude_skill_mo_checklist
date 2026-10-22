@@ -1,5 +1,18 @@
 # CHANGELOG — skill mo-checklist
 
+## 2.1.0 — 2026-10-22
+
+Thêm mục ngoài sheet sau khi làm A052 Horae Tarot v1.0.3, ticket P5210 (đối chiếu A052 `9572d22`, xtechads 1.8.3).
+
+- **`EXT-NATIVE-POOL`** — native pool dùng chung luồng Language/Onboard: slot thiếu ad thì mượn ad đã load của
+  placement khác (ưu tiên ad của chính slot → ad đã load chưa hiện mới nhất → ad đã hiện gần nhất → shimmer), mỗi lúc
+  1 lượt load (request lúc mở/resume màn bị bỏ khi đang có load khác), giữ ad cũ tới khi ad mới xong, nạp sẵn 1 trang
+  kế. Ref A052, RC `native_pool_logic` (bật/tắt cả logic, `false` = logic cũ) và `lock_swipe_ob` (khoá vuốt Onboard).
+  Recipe `onboarding.md` § EXT-NATIVE-POOL, kèm các bẫy đã gặp: 2 view cùng 1 `NativeAd`, ad mượn tự reload theo
+  `reloadWhenResume`, reload ngay sau impression khi trang kề lên trang chính.
+- `apps.json`: thêm `a052` (`A052_Tarot-2_Nuclear-Man`).
+- `onboarding.md` § Tổng quan nhóm: trỏ tới EXT-NATIVE-POOL ở phần preload xuyên trang.
+
 ## 2.0.0 — 2026-10-15
 
 Cập nhật sau khi làm MO checklist cho A049 Palm AI (noti ref A047; splash, language, onboarding, uninstall, inter ref

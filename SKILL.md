@@ -5,7 +5,7 @@ description: Làm / kiểm tra MO checklist (tactic Monetization) cho các app A
 
 # mo-checklist — làm MO checklist đồng bộ cho các app Android xTech
 
-Phiên bản **2.0.0** (2026-10-15) — thay đổi ghi ở `CHANGELOG.md`. Skill phân phối qua git: `/mo-checklist update` để
+Phiên bản **2.1.0** (2026-10-22) — thay đổi ghi ở `CHANGELOG.md`. Skill phân phối qua git: `/mo-checklist update` để
 kéo bản mới (xem `README.md`).
 
 Trước đây mỗi app tự làm MO checklist theo một kiểu, mỗi ticket lại "Ref" một app khác. Skill này là
@@ -91,7 +91,7 @@ python3 <skill>/scripts/catalog.py show <ID>
   và ghi rõ "chờ MO chốt Qx" trong báo cáo.
 
 ### 2. Chọn app ref và đọc code chuẩn bản hiện tại
-- Mặc định là **A013**. Mục có `canonical.app` khác (MO-85 → A045, EXT-AD-LOADING → A048; A013 không có tactic
+- Mặc định là **A013**. Mục có `canonical.app` khác (MO-85 → A045, EXT-AD-LOADING → A048, EXT-NATIVE-POOL → A052; A013 không có tactic
   đó) thì app đó thay A013 làm ref mặc định của mục; luật "ref ≠ A013" dưới đây chỉ áp khi user chọn ref khác.
 - Ref = aXXX khi user ghi `ref aXXX` trong lệnh, hoặc khi ticket ghi "Ref aXXX" và **user xác nhận** dùng.
 - **Khi ref ≠ A013:**
@@ -285,7 +285,7 @@ Dùng `catalog.py show <ID>` + section recipe, rồi giải thích bằng lời 
 | splash | `references/splash.md` | MO-21..31, 84, 96, 97, 99 |
 | language | `references/language.md` | MO-32..42, 86, 94, 98, DEV-6/8/9 |
 | select | `references/select.md` | MO-43..51, DEV-10 |
-| onboard | `references/onboarding.md` | MO-52..67, 92 |
+| onboard | `references/onboarding.md` | MO-52..67, 92, EXT-NATIVE-POOL |
 | noti | `references/notifications.md` | MO-4, 68..73, 75, 87..89, 95 |
 | reopen | `references/reopen.md` | MO-74, 76..78, 91 |
 | ads | `references/inapp-ads.md` | MO-79..82, 93, DEV-16, DEV-21, EXT-AD-LOADING |

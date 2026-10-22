@@ -17199,6 +17199,223 @@
    "notes": "Loading trước inter in-app tắt ở onNextAction / onAdFailedToShow / onAdClosed, không tắt ở onAdShow; loading lúc nạp app_resume do SDK tắt (hideResumeLoading) khi ad hiện, nạp hụt hoặc hết timeout. Gộp state loading vào cờ đang-có-ad (A048 isAdCoveringScreen, A049 isAdOnScreen) để noti/popup khác không bật lúc loading. A048 inter_after_ob cũng đi qua showInterWithLoading."
   },
   {
+   "id": "EXT-NATIVE-POOL",
+   "row": 0,
+   "sheet": "",
+   "group": "onboard",
+   "title": "Native pool dùng chung luồng Language/Onboard (mượn ad, 1 lượt load) — ngoài sheet",
+   "status": "active",
+   "flow": "Language + Onboard (luồng first_open)",
+   "sheet_text": {},
+   "owner": null,
+   "needs_dev": null,
+   "needs_qc": null,
+   "est": {
+    "dev_h": null,
+    "qc_h": null,
+    "qc_note": null
+   },
+   "figma": [],
+   "docs": [],
+   "sheet_hint": null,
+   "sheet_notes": "Không có dòng trong sheet MO: ticket A052 P5210 \"[logic load_show ad] Update logic load, show các vị trí ad luồng onboarding\" (v1.0.3) + spec \"Shared native pool — design\" MO gửi kèm. Không có MO-ID, nhận qua prompt.",
+   "sheet_status": {},
+   "images": [],
+   "old_ids": [],
+   "aliases": [
+    "native pool",
+    "shared native pool",
+    "pool native",
+    "native dùng chung",
+    "native dung chung",
+    "dùng chung native",
+    "dung chung native",
+    "mượn ad",
+    "muon ad",
+    "mượn native",
+    "muon native",
+    "lend ad",
+    "logic load show ad",
+    "logic load_show ad",
+    "load show ad onboarding",
+    "logic load ad onboarding",
+    "1 loading cùng lúc",
+    "1 loading cung luc",
+    "một lượt load",
+    "slot không bị trống",
+    "ad của placement khác",
+    "native_pool_logic",
+    "NativeAdPool",
+    "NativeAdPoolSlot",
+    "lock_swipe_ob",
+    "khoá vuốt onboard",
+    "khoa vuot onboard",
+    "chặn vuốt onboarding",
+    "P5210"
+   ],
+   "requirement": "Native luồng first-open (Language, Language Alt, các trang Onboard và trang native full-screen) dùng chung 1 pool: slot chưa có ad của chính nó thì hiện ad đã load của placement khác thay vì để trống; mỗi lúc chỉ 1 lượt load (request lúc mở/resume màn bị bỏ khi đang có load khác); đang load ad mới thì vẫn giữ ad cũ tới khi load xong; giữ user đủ lâu để ad kịp hiện (khoá vuốt theo RC). RC native_pool_logic bật/tắt cả logic.",
+   "acceptance": [
+    "Slot chọn ad theo thứ tự: ad của chính placement (đã load hoặc đang hiện) → ad đã load chưa hiện, mới nhất, của placement khác cùng template → ad đã hiện gần nhất → shimmer khi có ad đang load, không thì ẩn",
+    "Placement của slot bị tắt (config hoặc không được hiện ad) thì slot ẩn hẳn, không mượn ad",
+    "Request lúc mở/resume màn bị bỏ (không xếp hàng) khi pool đang có ad load; request do user bấm và trang FSN kế tiếp luôn đi",
+    "Đang tải lại thì vẫn hiện ad cũ, chỉ đổi khi ad mới load xong",
+    "1 ad chỉ gắn vào 1 view tại 1 thời điểm (không có 2 NativeAdView cùng 1 NativeAd)",
+    "Trang kề trong pager chỉ hiện ad của chính nó, không mượn; trượt sang trang kế thấy ad sẵn và không bị reload ngay sau impression lúc trượt vào",
+    "native_pool_logic = false chạy đúng logic cũ (mỗi slot ad riêng, preload trước 2 trang)",
+    "lock_swipe_ob = true: không vuốt được trang Onboard nào, kể cả vuốt Get Started ở trang cuối",
+    "Logic pool: trang FSN tự sang trang sau 10 s; không có ad và không đang load thì tự bỏ qua trang"
+   ],
+   "sdk": {
+    "available": "partial",
+    "api": "AdGroupUnit (statusFlow, adData, adLoadedTime, adImpressionTime, loadAd); NativeBannerGroupView",
+    "min_version": null,
+    "note": "SDK không có pool: mỗi NativeBannerGroupView chỉ vẽ ad của chính placement. xtechads 1.8.3 làm rối tên lớp AdGroupAd nên app không lấy được NativeAd để tự vẽ; ad mượn phải vẽ bằng NativeBannerGroupView của placement cho mượn. View tự loadAd khi resume (reloadWhenResume) và xử lý click reload/disable theo LocalLifecycleOwner, nên ad mượn và trang kề phải đặt dưới lifecycle bị kẹp ở STARTED."
+   },
+   "canonical": {
+    "app": "a052",
+    "files": [
+     "ads/NativeAdPool.kt",
+     "ads/NativeAdPoolSlot.kt",
+     "ads/AdsManager.kt",
+     "ads/NativeAdBuffer.kt",
+     "ui/screen/onboard/OnboardScreen.kt",
+     "ui/screen/onboard/OnboardViewModel.kt",
+     "ui/screen/onboard/view/OnboardContent.kt",
+     "ui/screen/language/normal/LanguageScreen.kt",
+     "ui/screen/language/alternative/LanguageAltScreen.kt"
+    ],
+    "verified_commit": "9572d22",
+    "symbols": [
+     "NativeAdPool.pick",
+     "NativeAdPool.hasAdFor",
+     "NativeAdPool.fetch",
+     "NativeAdPool.claim",
+     "NativeAdPool.canFill",
+     "NativeAdPoolSlot",
+     "GatedLifecycleOwner",
+     "AdsManager.nativeAdPool",
+     "AdsManager.useNativePool",
+     "AdsManager.fetchOnboardAds",
+     "AdsManager.fetchLanguageAds",
+     "AdsManager.onboardAdReady",
+     "OnboardViewModel.autoNextFullScreen",
+     "OnboardState.lockSwipe"
+    ],
+    "note": "Không có chuẩn A013 (mục ngoài sheet). A052 v1.0.3 (10/2026), commit 9572d22 \"P5210 update logic pool ad\". Đường dẫn tính từ app/src/main/java/com/ai/live/tarot2/."
+   },
+   "rc_keys": [
+    {
+     "key": "native_pool_logic",
+     "type": "Boolean",
+     "default": "true",
+     "meaning": "true = pool dùng chung; false = logic cũ (mỗi slot ad riêng, preload trước 2 trang). Chốt 1 lần mỗi process, đọc lần đầu sau khi Splash fetch RC",
+     "aliases": [
+      {
+       "key": "native_pool_logic",
+       "apps": [
+        "a052"
+       ],
+       "note": "tên đặt lúc làm A052, MO chưa đưa tên"
+      }
+     ]
+    },
+    {
+     "key": "lock_swipe_ob",
+     "type": "Boolean",
+     "default": "false",
+     "meaning": "Khoá vuốt pager Onboard, kể cả vuốt Get Started ở trang cuối; user chỉ đi bằng nút. Độc lập với native_pool_logic",
+     "aliases": [
+      {
+       "key": "lock_swipe_ob",
+       "apps": [
+        "a052"
+       ],
+       "note": "Boolean; từng thử đổi sang ms rồi PO quay lại Boolean"
+      }
+     ]
+    }
+   ],
+   "events": [
+    {
+     "name": "iaa_impression",
+     "params": "ad_unit_name = unit của placement cho mượn; screen_name = màn đang hiện",
+     "note": "ad mượn tính impression và doanh thu cho placement cho mượn"
+    }
+   ],
+   "placements": [
+    {
+     "name": "language",
+     "format": "native",
+     "aliases": []
+    },
+    {
+     "name": "language_alt",
+     "format": "native",
+     "aliases": []
+    },
+    {
+     "name": "onboard_1",
+     "format": "native",
+     "aliases": []
+    },
+    {
+     "name": "onboard_2",
+     "format": "native",
+     "aliases": []
+    },
+    {
+     "name": "onboard_3",
+     "format": "native",
+     "aliases": []
+    },
+    {
+     "name": "onboard_4",
+     "format": "native",
+     "aliases": []
+    },
+    {
+     "name": "fs_onboard_12",
+     "format": "native",
+     "aliases": []
+    },
+    {
+     "name": "fs_onboard_23",
+     "format": "native",
+     "aliases": []
+    },
+    {
+     "name": "native_full_splash_high",
+     "format": "native",
+     "aliases": []
+    }
+   ],
+   "depends_on": [
+    "MO-35",
+    "MO-59"
+   ],
+   "detect": {
+    "any": [
+     "NativeAdPool",
+     "\"native_pool_logic\"",
+     "NativeAdPoolSlot"
+    ],
+    "all": [
+     "NativeAdPool",
+     "\"native_pool_logic\""
+    ]
+   },
+   "recipe": "references/onboarding.md § EXT-NATIVE-POOL",
+   "qc": [
+    "Bản release (ad thật): vào OB1 lúc ad OB1 chưa có → thấy tạm ad của màn trước rồi tự đổi sang ad OB1",
+    "Kéo chậm giữa 2 trang: trang kế đã có ad, không khung xám; trang dừng hẳn không reload (logcat mỗi trang 1 iaa_impression)",
+    "Ở trang FSN tắt mạng, chờ tự sang OB3: OB3 vẫn có ad mượn; bật mạng → đổi sang ad của OB3",
+    "native_pool_logic = false: log load giống logic cũ (Alt nạp OB đầu + FSN, đổi trang nạp lại trang trước + 2 trang sau)",
+    "lock_swipe_ob = true: không vuốt được trang nào, kể cả trang cuối",
+    "Bản debug: adb logcat | grep NativeAdPool → fetch soft / urgent / soft dropped / refused"
+   ],
+   "notes": "Request soft bị bỏ chứ không xếp hàng (theo spec). Pool chia 2 nhóm theo template (native vừa / full-screen), không mượn chéo. Slot claim unit trước khi render, nhả khi view dispose. Ad mượn và trang kề dùng lifecycle kẹp STARTED; trang kề lên làm trang chính thì SDK chỉ thấy RESUMED ở lần resume thật kế tiếp. Ad trang hiện tại có và pool rảnh thì nạp sẵn (soft) trang kế. Có mạng lại thì gọi lại fetch của màn đang mở. Buffer Language Alt (MO-98) giữ nguyên, không reset khi rời Language để còn cho mượn."
+  },
+  {
    "id": "CC-2",
    "row": 2,
    "sheet": "Crawl Competitor",

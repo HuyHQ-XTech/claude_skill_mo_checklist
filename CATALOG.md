@@ -107,6 +107,7 @@ Trạng thái: `active` = đang áp dụng · `candidate` = MO đang cân nhắc
 | MO-66 | Impression flow 1px: đứng FSN có impression OB2 + OB4 + full-screen | không | a013 | active |
 | MO-67 | Impression flow 1px: đứng OB4 có impression OB4 + full-screen | không | a013 | active |
 | MO-92 | Vuốt tiếp ở trang onboard cuối vẫn vào màn kế (Home) | không | a013 | active |
+| EXT-NATIVE-POOL | Native pool dùng chung luồng Language/Onboard (mượn ad, 1 lượt load) — ngoài sheet | một phần | a052 | active |
 
 ## Notification
 
@@ -244,6 +245,7 @@ Thứ tự chọn tên key khi code: tên user/ticket đưa → tên app đang c
 | `language_oder` | DEV-6 | Long | 0 | `language_order` (a027 — default 4; comment a027 nói đây là tên trên RC của a013 → cần MO xác nhận key thật); `language_config.default_language_index` (a047 — default 1) |
 | `language_oder` | MO-36 | Long | 0 | `language_config.finger_position` (a034, a037, a042, a045, a048, a049 — chỉ chọn dòng có ngón tay (1-based), không dời ngôn ngữ máy; default a048/a049 1, a037 4; A048 không kẹp, A049 kẹp 1..n; a045 bỏ field này từ v1.0.9 (ngón tay luôn ở dòng ngôn ngữ máy)); `language_order` (a027 — default 4) |
 | `layoutMeta` | MO-61 | String (field trong RC JSON ads_config) | theo app/config/ads_config.json | `layout_native_onboard_1` (a028 — key phẳng, có _meta và _2/_3; FSN: layout_native_fsn(_meta); map trong AdsManager.layoutNative); `layoutKeyMeta` (a041 — field config tự viết); `typeMeta` (a036 — field native position (AdsConfigProvider.getLayoutResForNameSpace)) |
+| `lock_swipe_ob` | EXT-NATIVE-POOL | Boolean | false | `lock_swipe_ob` (a052 — Boolean; từng thử đổi sang ms rồi PO quay lại Boolean) |
 | `logic_pass_splash` | MO-29 | String | reload | `logic_pass_splash` (a045 — mặc định auto_next); `logic_pass_splash` (a034 — mặc định reload) |
 | `logic_pass_splash` | MO-93 | String | reload |  |
 | `min_ad_interval_language_alt` | MO-98 | Long (ms) | 1000 | `min_ad_interval_language_alt` (a027, a033, a042, a048 — cùng tên); `language_config.min_ad_interval_alt` (a037, a049, a045 — default 1000) |
@@ -253,6 +255,7 @@ Thứ tự chọn tên key khi code: tên user/ticket đưa → tên app đang c
 | `native_full_pre_auto_pass_time` | MO-43 | Long (giây) | 2 | `native_full_pre_auto_pass_time` (a027 — cùng tên); `native_full_pre_auto_pass_time` (a045 — default 15); `select_config.preparing.auto_pass_time` (a045 — a045 từ v1.0.9, giây, 10 (key phẳng cũ 15)) |
 | `native_full_pre_countdown_time` | MO-43 | Long (giây) | 5 | `native_full_pre_countdown_time` (a027, a045 — cùng tên); `select_config.preparing.countdown_time` (a045 — a045 từ v1.0.9, giây, 5) |
 | `native_full_time_to_countdown` | MO-59 | Long (ms) | 2000 | `time_close_fsn_ob` (a039 — giây, 5); `time_close_fsob12` (a027 — giây, 2, chỉ FSN12 (FSN23 hiện X ngay)); `onboard_2fsn_close_countdown` (a016 — giây, 5, đếm ngầm, chỉ khi onboard_2_fsn=true); `show_close_native_fs_countdown` (a034, a037 — giây (a034 5, a037 3)); `time_show_button_X_fsn` (a044, a047, a049 — giây, 5, đếm ngầm; a047/a049 đếm từ lúc ad hiện khi FSN là trang hiện tại; a049 0 = X hiện ngay); `time_close_FS_onboard` (a014 — giây, 0); `closeCountdown` (a036 — field native position trong ads_config tự viết); `onboard_config.fsn_close_second` (a045 — a045 từ v1.0.9, giây, 5 (trước đó time_show_button_X_fsn)) |
+| `native_pool_logic` | EXT-NATIVE-POOL | Boolean | true | `native_pool_logic` (a052 — tên đặt lúc làm A052, MO chưa đưa tên) |
 | `native_splash_high_logic` | MO-29 | Boolean | true | `native_splash_high_logic` (a045, a034 — cùng tên) |
 | `new_onboard` | MO-63 | Boolean | true |  |
 | `new_uninstall_enable` | MO-74 | Boolean | true |  |
