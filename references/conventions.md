@@ -22,9 +22,11 @@ Kèm theo:
 - Theo **kiểu tổ chức RC** của app:
   - key phẳng `SharedPreferenceProperty("key", default)` như A013 và đa số app;
   - hoặc JSON nhóm (`language_config`, `onboard_config`, `noti_config`… ở a037, Langofy, a034, a045 từ v1.0.9,
-    A047, A048, A049). Khi đó thêm field vào đúng nhóm và báo đường dẫn JSON cho MO. a045, A048, A049 đọc nhóm
+    A047, A048, A049, A052 từ v1.0.3). Khi đó thêm field vào đúng nhóm và báo đường dẫn JSON cho MO. a045, A048, A049 đọc nhóm
     qua `RcGroup` (`domain/preference/RcGroup.kt`, khai nhóm trong `SharedPrefs.kt`), field lồng viết dạng
     `tick.size`, `lockscreen.slots`.
+    A052 đặt tên field đúng bằng tên key phẳng cũ, JSON phẳng 1 tầng (`onboard_config.enable_onboard_1`). App đang
+    key phẳng muốn chuyển sang JSON nhóm: làm theo `EXT-RC-GROUP` (`setup.md`), hỏi user chọn kiểu tên field trước.
 - Theo **kiểu tên placement** của app: `language`/`language_alt`/`onboard_1`/`fs_onboard` (chuẩn A013) hay
   `native_lang`/`native_lang_alt`/`native_ob1`/`native_fsob` (a016, a037, a039, Langofy). App mới hoặc
   chưa có kiểu thì dùng chuẩn A013.

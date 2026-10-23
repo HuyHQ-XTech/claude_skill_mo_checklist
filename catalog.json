@@ -16103,6 +16103,152 @@
    "notes": "Sau khi tích hợp áp MO-97 + DEV-3. Bẫy: thiếu AdHostActivity (app-open chết), AdsManager không createdAtStart (a037), SharedPrefs cũ khác file packageName (mất data), plugin/AAR lệch version. Release crash R8 WorkManager/Room trên AGP 9 (setup.md Tổng quan). Tên adunit phải theo tiền tố để test ad bản debug đúng loại."
   },
   {
+   "id": "EXT-RC-GROUP",
+   "row": 0,
+   "sheet": "",
+   "group": "setup",
+   "title": "Gộp key Remote Config theo màn vào parameter JSON (xxx_config) — ngoài sheet",
+   "status": "active",
+   "flow": "Toàn app (RC của mọi màn)",
+   "sheet_text": {},
+   "owner": null,
+   "needs_dev": null,
+   "needs_qc": null,
+   "est": {
+    "dev_h": null,
+    "qc_h": null,
+    "qc_note": null
+   },
+   "figma": [],
+   "docs": [],
+   "sheet_hint": null,
+   "sheet_notes": "Không có dòng trong sheet MO: A052 v1.0.3 \"merge RC\" (commit b3701fb), làm theo mẫu A045 1.0.9 / a037 / a027. Không có MO-ID, nhận qua prompt.",
+   "sheet_status": {},
+   "images": [],
+   "old_ids": [],
+   "aliases": [
+    "gộp RC",
+    "gop RC",
+    "gộp key RC",
+    "gop key RC",
+    "gộp remote config",
+    "gop remote config",
+    "gộp key remote config",
+    "gom RC",
+    "gom key RC",
+    "gom remote config",
+    "merge RC",
+    "merge remote config",
+    "RC group",
+    "remote config group",
+    "remote-config-group",
+    "RC JSON",
+    "JSON RC",
+    "RC dạng JSON",
+    "RC dang JSON",
+    "parameter JSON",
+    "RcGroup",
+    "xxx_config",
+    "gộp RC theo màn",
+    "gop RC theo man",
+    "RC gộp",
+    "RC gop"
+   ],
+   "requirement": "Mỗi màn / tính năng chỉ dùng một parameter JSON trên Firebase (splash_config, language_config, onboard_config, noti_config, rate_config…) thay cho nhiều key phẳng. Trước khi code hỏi user cách đặt tên field (giống tên key RC cũ hay tên mới rút gọn), phạm vi, cắt hay fallback key cũ, default; làm xong in khối RC đã chỉnh (key / type: json / value) cho MO.",
+   "acceptance": [
+    "Không tạo parameter nào trên Firebase: app chạy y như hiện tại (default code = giá trị Firebase đang chạy, trừ khi user chọn khác)",
+    "Field thiếu / sai kiểu / JSON hỏng / parameter lưu thành số hoặc boolean: dùng default, không crash, log 1 lần",
+    "Getter trong SharedPrefs giữ nguyên tên và kiểu cũ, chỗ gọi không đổi",
+    "Tên field theo option user chọn: giống tên key RC cũ (JSON phẳng 1 tầng) hoặc tên mới rút gọn (có object lồng, tài liệu có cột Thay cho)",
+    "Tài liệu RC của app, CLAUDE.md và sheet Remote config (cột Version note) cập nhật",
+    "Báo cáo cuối in khối RC đã chỉnh cho từng parameter: key / type: json / value (JSON mặc định 1 dòng)"
+   ],
+   "sdk": {
+    "available": false,
+    "api": "RemoteConfigManager (xtechcore) ghi RC xuống prefs; XtechSharedPref.getString",
+    "min_version": null,
+    "note": "SDK không có API nhóm RC. RemoteConfigManager ghi mọi key có trên server xuống prefs <applicationId> theo kiểu đoán Long → Double → Boolean → String, không xoá key cũ, không ghi key không có trên server: JSON nhập thành số / boolean làm getString ném lỗi; key test tiêm vào prefs bị fetch đè nếu key có trên server."
+   },
+   "canonical": {
+    "app": "a052",
+    "files": [
+     "domain/preference/RcGroup.kt",
+     "domain/preference/SharedPrefs.kt"
+    ],
+    "verified_commit": "b3701fb",
+    "symbols": [
+     "RcGroup.string",
+     "RcGroup.long",
+     "RcGroup.bool",
+     "RcGroup.list",
+     "SharedPrefs.splashRc",
+     "SharedPrefs.onboardRc",
+     "SharedPrefs.notiRc"
+    ],
+    "note": "Không có chuẩn A013 (A013 dùng key phẳng). A052 v1.0.3 chọn tên field giống key cũ (JSON phẳng). Option tên mới rút gọn: A045 docs/features/remote-config-group.md + RcGroup.json(path), a037 docs/remote-config-group.md §5. Đường dẫn tính từ app/src/main/java/com/ai/live/tarot2/; tài liệu ở docs/remote-config-group.md (gốc repo)."
+   },
+   "rc_keys": [
+    {
+     "key": "splash_config",
+     "type": "JSON",
+     "default": "theo app (= giá trị Firebase lúc gộp)",
+     "meaning": "Nhóm RC Splash",
+     "aliases": []
+    },
+    {
+     "key": "language_config",
+     "type": "JSON",
+     "default": "theo app",
+     "meaning": "Nhóm RC Language + Language Alt (nhiều app đã có từ trước)",
+     "aliases": []
+    },
+    {
+     "key": "onboard_config",
+     "type": "JSON",
+     "default": "theo app",
+     "meaning": "Nhóm RC Onboard + trang native full-screen",
+     "aliases": []
+    },
+    {
+     "key": "noti_config",
+     "type": "JSON",
+     "default": "theo app",
+     "meaning": "Nhóm RC noti + quyền",
+     "aliases": []
+    },
+    {
+     "key": "rate_config",
+     "type": "JSON",
+     "default": "theo app",
+     "meaning": "Nhóm RC popup rating",
+     "aliases": []
+    }
+   ],
+   "events": [],
+   "placements": [],
+   "depends_on": [
+    "MO-17"
+   ],
+   "detect": {
+    "any": [
+     "RcGroup",
+     "_config\", ::getString"
+    ],
+    "all": [
+     "RcGroup"
+    ]
+   },
+   "recipe": "references/setup.md § EXT-RC-GROUP",
+   "qc": [
+    "Không tạo parameter nào: app chạy đúng mặc định = hành vi Firebase hiện tại",
+    "Tạo parameter với 1 field khác default (vd tắt 1 trang Onboard): chỉ hành vi đó đổi",
+    "Sai kiểu (123, {broken): không crash, về mặc định",
+    "Chỉ còn key phẳng cũ, không có parameter nhóm: bản mới không ăn key cũ",
+    "A/B dựng lại trên parameter mới: mỗi nhánh nhận đúng giá trị (đọc frc_*_firebase_activate.json)"
+   ],
+   "notes": "Hỏi user trước khi code (AskUserQuestion): 1) tên field giống key RC cũ (khuyên, A052) hay tên mới rút gọn (A045/a037/a027); 2) phạm vi nhóm; 3) cắt hẳn hay fallback key phẳng; 4) default = Firebase hay default code cũ; 5) unit test hay chỉ verify máy. Để phẳng: key SDK, key ads dùng nhiều màn, flag lẻ, config server. A/B trên key phẳng phải dựng lại trên parameter mới."
+  },
+  {
    "id": "DEV-3",
    "row": 3,
    "sheet": "Checklist - Dev - không xoá",

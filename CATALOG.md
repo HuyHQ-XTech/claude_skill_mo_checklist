@@ -25,6 +25,7 @@ Trạng thái: `active` = đang áp dụng · `candidate` = MO đang cân nhắc
 | MO-19 | MultiDex | không | a013 | active |
 | MO-20 | Đổi layout native/banner qua RC (kể cả native Meta) | có | a013 | active |
 | MO-100 | Init SDK theo SDK Integration Guide | có | a013 | active |
+| EXT-RC-GROUP | Gộp key Remote Config theo màn vào parameter JSON (xxx_config) — ngoài sheet | không | a052 | active |
 
 ## Splash
 
@@ -239,6 +240,7 @@ Thứ tự chọn tên key khi code: tên user/ticket đưa → tên app đang c
 | `in_app_update_immediate_priority` | DEV-19 | Long | 4 | `force_update` (a016 — cùng ngữ nghĩa ngưỡng, theo doc SDK) |
 | `in_app_update_timeout_ms` | DEV-19 | Long | 5000 |  |
 | `interval_skip_inter` | MO-82 | Long (ms) | 20000 | `interval_inter_inapp` (a047, a042, a048, a049 — ms; a047 20000, a042 30000, a048 30000; a049 default 20000 (sheet Ad script, 15/10/2026)); `time_interval_inter` (a044 — ms, 20000); `inter_all_interval` (a033, a042 — ms; a033 15000, a042 45000); `interval_skip_inter` (a028, a036 — a028 default 15000) |
+| `language_config` | EXT-RC-GROUP | JSON | theo app |  |
 | `language_hint_delay_second` | MO-36 | Long (giây) | 2 | `language_hint_delay_second` (a045 — default 5); `delay_show_tooltips` (a034 — ms, default 2000); `time_show_tooltips_language` (a014 — giây, default 4, cộng dồn qua các lần resume); `language_config.hint_delay_second` (a045 — a045 từ v1.0.9, default 5) |
 | `language_next` | MO-30 | String | select | `navigationFlow.language_next` (a045, a014, a047, a033, a034, a037, a039, a044, a027); `navigationFlow.languageNext` (a016) |
 | `language_next` | MO-42 | String | select | `navigationFlow.language_next` (a028, a036, a039, a044, a045 — đọc qua getNavigationValue; default onboard); `languageNext` (a016 — navigationFlow camelCase; default onboard); `language_next` (a041 — key phẳng, default onboard) |
@@ -259,6 +261,7 @@ Thứ tự chọn tên key khi code: tên user/ticket đưa → tên app đang c
 | `native_splash_high_logic` | MO-29 | Boolean | true | `native_splash_high_logic` (a045, a034 — cùng tên) |
 | `new_onboard` | MO-63 | Boolean | true |  |
 | `new_uninstall_enable` | MO-74 | Boolean | true |  |
+| `noti_config` | EXT-RC-GROUP | JSON | theo app |  |
 | `noti_kill_app_show_all` | MO-69 | Boolean | false |  |
 | `noti_lockscreen_enable` | CC-3 | Boolean | true |  |
 | `noti_lockscreen_enable` | MO-95 | Boolean | true | `enable_noti_lockscreen` (a047 — cùng nghĩa); `show_lockscreen_noti` (a033, a034, a048 — cùng nghĩa); `noti_config:lockscreen.enable` (a037, a049 — RC gom JSON nhóm noti_config) |
@@ -271,10 +274,12 @@ Thứ tự chọn tên key khi code: tên user/ticket đưa → tên app đang c
 | `ob1_swipe` | MO-53 | Boolean | true | `action_click_back_ob` (a016 — =2: back → đứng yên + hint (OB1 hint bấm, trang khác hint vuốt) — phần backpress) |
 | `ob_back_btn` | MO-28 | Boolean | true |  |
 | `ob_back_btn` | MO-52 | Boolean | true | `action_click_back_ob` (a016 — Long: 1 popup thoát, 2 đứng yên + hint, 3 lùi trang (OB1 → Language); chỉ back hệ thống, không có nút); `action_click_back_device_ob` (a047 — String trong JSON onboard_config: keep_state \| reload (lùi trang + reload ad; OB1 → Language)); `is_show_button_back` (a044 — kèm position_show_button_back; đích tra ngược navigationFlow) |
+| `onboard_config` | EXT-RC-GROUP | JSON | theo app |  |
 | `onboard_next` | MO-30 | String | home | `navigationFlow.onboard_next` (a045, a014, a047, a033, a034, a037, a039, a044, a027); `navigationFlow.onboardNext` (a016); `scan_onboard_next` (a027); `paywall_next` (a027); `paywallNext` (a016); `iap_next` (a044) |
 | `onboard_next` | MO-63 | String | home | `onboardNext` (a016 — camelCase trong navigationFlow); `navigationFlow` (a027, a028, a033, a037, a044, a045 — entry onboard_next trong ads_config; giá trị paywall thay cho iap (a027, a028); a027 thêm scan_onboard, a045 thêm uninstall) |
 | `preload_lead_inter` | MO-82 | Long (ms) | 5000 | `preload_inter_buffer_second` (a014, a016, a033, a034, a041, a044, a045, a047, a048, a049 — GIÂY, default 5); `second_preload_inter_buffer` (a039 — giây, 5); `preload_inter_interval` (a027, a037 — giây, 5) |
 | `priority_languages` | DEV-6 | String (CSV) |  | `priority_languages` (a044 — default en,pt-BR,hi,de); `priority_languages` (a027 — default ar,hi,en,uk,fr,bn,ru,pt,th,es); `language_config.priority_languages` (a034, a045 — mảng JSON trong RC language_config; token system = vị trí ngôn ngữ máy); `language_config.order` (a037, a042, a048, a049 — trong RC language_config; a048/a049 nhận mảng JSON hoặc CSV, cắt 10 (PRIORITY_LANGUAGE_LIMIT) trước khi lọc; default a048 en,es,pt,ar; a049 theo doc PO); `top_languages` (a033 — String CSV, default en,hi,pt,vi,bn,pl,in,es,uk,tw,fr) |
+| `rate_config` | EXT-RC-GROUP | JSON | theo app |  |
 | `rate_success` | MO-85 | Boolean | true | `show_rating_at_success` (a013 — A013: 1 lần/ngày); `show_rating` (a037, a039) |
 | `rate_success_jump` | MO-85 | Long | 1 |  |
 | `rate_success_trigger` | MO-85 | Long | 2 | `rating_dialog_trigger_count` (a014 — A014 bản cũ, default 3, đã bỏ); `rating_min_success` (a045 — A045 bản cũ) |
@@ -294,6 +299,7 @@ Thứ tự chọn tên key khi code: tên user/ticket đưa → tên app đang c
 | `show_collab_home` | DEV-21 | Boolean | true | `nativeSplashCollapse` (a016 — đúng chuỗi key, default true) |
 | `show_iap_after_splash` | MO-5 | Boolean | true | `iap_first_open_enabled` (a014 — bật paywall trong FO) |
 | `show_small_button_select` | MO-43 | Boolean | true | `show_small_button_select` (a016 — default false) |
+| `splash_config` | EXT-RC-GROUP | JSON | theo app (= giá trị Firebase lúc gộp) |  |
 | `splash_next` | MO-30 | String | language | `navigationFlow.splash_next` (a045, a014, a047, a033, a034, a037, a039, a044, a027 — đọc qua AdsConfigProvider.getNavigationValue trong ads_config); `navigationFlow.splashNext` (a016 — camelCase) |
 | `star_review_to_store` | MO-85 | Long | 4 |  |
 | `time_show_loading_ads` | EXT-AD-LOADING | Long (ms) | 1000 | `time_show_loading_ads` (a039, a048, a049 — cùng tên; a039 default 500, a048/a049 1000) |
