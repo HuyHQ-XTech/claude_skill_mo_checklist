@@ -1,4 +1,4 @@
-# Onboarding (First open) — MO-52…MO-67, MO-92
+# Onboarding (First open) — MO-52…MO-67, MO-92, EXT-NATIVE-POOL
 
 Cách đọc file này:
 - **Không có code.** Mỗi mục mô tả cơ chế, quyết định, bẫy, QC, rồi chỉ tới file + symbol. Lúc làm luôn mở
@@ -84,6 +84,8 @@ Cách đọc file này:
    - trang được pager dựng sẵn tự request sớm (a049 thấy `fs_onboard_2` request ngay lúc kéo khỏi OB1, 10/2026);
    - native bị gỡ khỏi composition (gate `nearActive`, hoặc trang ra ngoài cửa sổ compose) rồi dựng lại thì ad đã
      impression bị thay, bất kể cờ `reload_*` của app (MO-62).
+6. A052 (10/2026) nạp/hiện theo cách khác cho cả Language + Onboard: pool dùng chung, slot thiếu ad thì mượn ad của
+   placement khác, mỗi lúc 1 lượt load, nạp sẵn 1 trang. Xem EXT-NATIVE-POOL.
 
 ### Remote config của nhóm (A013)
 
@@ -890,3 +892,121 @@ mới" thì dùng `actionClicked: reload` ở nameSpace (SDK), hoặc thêm giá
   - Vuốt lùi ở trang cuối → về trang trước bình thường.
   - Ngôn ngữ RTL: vuốt trái → phải ở trang cuối → đi.
   - Bấm Get started rồi vuốt ngay → chỉ 1 lần navigate.
+
+## EXT-NATIVE-POOL — Native pool dùng chung luồng Language/Onboard (mượn ad, 1 lượt load) — ngoài sheet
+
+> Không có dòng trong sheet MO nên không có MO-ID. Skill nhận mục này qua prompt ("native pool", "mượn ad", "logic
+> load_show ad", "1 loading cùng lúc"…). Nguồn: ticket A052 P5210 (v1.0.3) "[logic load_show ad] Update logic load, show
+> các vị trí ad luồng onboarding" và spec "Shared native pool — design" MO gửi kèm. Dòng dán sheet MO ghi
+> `EXT-NATIVE-POOL (ngoài sheet)`. Mục gồm cả Language/Language Alt nhưng để ở nhóm onboard vì phần lớn cơ chế nằm
+> ở pager.
+
+- **Yêu cầu** (brief của MO):
+  - Slot ưu tiên ad của chính placement, nếu đã load hoặc đang hiện.
+  - Chưa có thì hiện ad đã load mà chưa hiện, mới nhất, của bất kỳ placement nào.
+  - Vẫn chưa có thì hiện ad đang hiện gần nhất của placement khác, để slot không bị trống.
+  - Cuối cùng mới hiện shimmer.
+  - Giữ user đủ lâu để ad kịp hiện: khoá vuốt (RC).
+  - Mỗi lúc chỉ 1 lượt load native.
+  - Luôn hiện ad cũ, ad mới load xong mới thay vào.
+- **Nghiệm thu**:
+  - Slot chọn ad theo đúng thứ tự trên. "Placement khác" chỉ tính placement cùng template: native vừa (Language, Alt,
+    OB1–4) và native full-screen (2 trang FSN, `native_full_splash_high` lúc được mượn) là 2 nhóm riêng, không mượn chéo.
+  - Placement của slot bị tắt (config hoặc không được hiện ad) thì slot ẩn hẳn, không mượn.
+  - Request lúc mở/resume màn bị **bỏ** (không xếp hàng) khi pool đang có ad load; request do user bấm và trang FSN kế
+    tiếp luôn đi.
+  - Đang tải lại thì vẫn hiện ad cũ, chỉ đổi khi ad mới load xong.
+  - 1 ad chỉ gắn vào 1 view tại 1 thời điểm.
+  - Trang kề trong pager chỉ hiện ad của chính nó; trượt sang trang kế thấy ad sẵn, không bị reload ngay sau impression
+    lúc trượt vào.
+  - `native_pool_logic = false` chạy đúng logic cũ; `lock_swipe_ob = true` không vuốt được trang Onboard nào.
+- **SDK**:
+  - Không có pool: mỗi `NativeBannerGroupView` chỉ vẽ ad của chính placement nó nhận. Unit cache theo cặp
+    `placement:nameSpace` nên mọi slot cùng placement dùng chung 1 ad.
+  - xtechads 1.8.3 làm rối tên lớp `AdGroupAd`, app không lấy được `NativeAd` để tự vẽ. Ad mượn phải vẽ bằng chính
+    `NativeBannerGroupView` của placement cho mượn → impression, click, doanh thu tính cho placement cho mượn.
+  - Trạng thái để chọn ad lấy từ `AdGroupUnit`: `statusFlow`, `adData`, `adLoadedTime` (đã load), `adImpressionTime`
+    (đã hiện: `adImpressionTime ≥ adLoadedTime`). `keepAdWaitLoading` mặc định true nên lúc `LOADING`/`TIMEOUT` view
+    vẫn giữ ad cũ.
+  - View tự gọi `loadAd` lúc vào composition / `ON_RESUME` (`reloadWhenResume`) và xử lý click `reload`/`disable`
+    theo `LocalLifecycleOwner` (`NativeBannerGroupViewImpl`, `LifecycleResumeEffect`).
+- **Chuẩn của mục này = A052** (A013 không có). Đường dẫn tính từ `app/src/main/java/com/ai/live/tarot2/`:
+  - `ads/NativeAdPool.kt`: `NativeAdPool` giữ danh sách member (placement, nameSpace, nhóm, layout, `isActive`); `pick`
+    (chọn ad cho slot, bỏ qua ad slot khác đang giữ), `hasAdFor` / `canFill` (trang FSN có ad để hiện không), `fetch`
+    (soft/urgent), `claim` / `release` (khoá bind).
+  - `ads/NativeAdPoolSlot.kt`: composable `NativeAdPoolSlot(placement, nameSpace, isFront)` thay `NativeAdSlot` ở
+    Language/Alt/OB/FSN; `GatedLifecycleOwner`.
+  - `ads/AdsManager.kt`: `nativeAdPool` (khai member), `useNativePool`, `fetchNative`, `fetchLanguageAds`,
+    `fetchOnboardAds`, `onboardAdReady`; nhánh logic cũ `preloadAdsFO`, `preloadOnboard`.
+  - Màn: `ui/screen/language/normal/LanguageScreen.kt`, `ui/screen/language/alternative/LanguageAltScreen.kt`,
+    `ui/screen/onboard/OnboardScreen.kt`, `ui/screen/onboard/OnboardViewModel.kt` (`autoNextFullScreen`, `lockSwipe`),
+    `ui/screen/onboard/view/OnboardContent.kt` (`isFront` = `settledPage`).
+- **Remote config**:
+  - `native_pool_logic` (Boolean, `true`): `false` = logic cũ (mỗi slot ad riêng; Alt nạp OB đầu + FSN; đổi trang nạp
+    lại trang trước + 2 trang sau; FSN theo status của chính nó). Chốt 1 lần mỗi process (`useNativePool` lazy), đọc
+    lần đầu sau khi Splash fetch RC, để Language và Onboard không lệch logic giữa chừng.
+  - `lock_swipe_ob` (Boolean, A052 `false`): khoá vuốt pager Onboard, kể cả vuốt Get Started ở trang cuối (lúc đó
+    `allow_swipe_get_started` / MO-92 không còn tác dụng). Độc lập với `native_pool_logic`. Chỉ Onboard, Language không
+    có pager.
+  - Tên 2 key do dev đặt lúc làm A052, MO chưa đưa tên; app khác làm theo mục này thì hỏi MO trước.
+- **Placement / tracking**:
+  - Không thêm placement mới. Member pool: `language`, `language_alt` (+ buffer nameSpace `language_alt`, MO-98),
+    `onboard_1..4`, `fs_onboard_12`, `fs_onboard_23`, `native_full_splash_high` (chỉ khi FS12 mượn native full splash).
+  - `iaa_impression` của ad mượn mang `ad_unit_name` của placement cho mượn, `screen_name` là màn đang hiện.
+- **Cách làm**:
+  1. Pool 1 instance mỗi process (lazy trong `AdsManager`), thu `statusFlow` của mọi member trên Main vào 1 map snapshot
+     để composable tự vẽ lại khi trạng thái đổi. Quyết định load đọc status thật của unit.
+  2. Chọn ad cho slot (`pick`): unit của chính slot đang giữ ad còn hạn (~55 phút) → ad đã load chưa hiện mới nhất trong
+     nhóm → ad đã hiện gần nhất → không có thì slot hiện shimmer khi nhóm có unit đang load (hoặc chính slot đang load:
+     vẽ view của nó để có placeholder của SDK), không thì ẩn. Ad đang hiện mà nạp lại hụt (`FAIL`, còn mạng) thì giữ
+     view đó, vì SDK vẫn vẽ ad cũ.
+  3. Nạp (`fetch`): placement bị tắt / không được hiện ad → bỏ. Soft mà pool đang có unit `LOADING`/`TIMEOUT` (dưới
+     60 s, tránh kẹt vĩnh viễn) → bỏ. Offline, unit đang giữ ad, hoặc đang load → không làm gì. Còn lại `loadAd`.
+     - Splash: soft `language`. Language resume: soft `language` + `language_alt` (+ buffer).
+     - Alt mở: urgent unit đang hiện (buffer); soft native trang OB đầu (OB1 tắt thì urgent FSN12).
+     - Trang OB được chọn / resume: soft placement trang đó; trang kế là FSN thì urgent; đang ở FSN thì urgent chính nó.
+     - Ad của trang hiện tại đã có và pool rảnh → soft nạp sẵn trang kế (1 trang, thay preload 2 trang của logic cũ).
+     - Có mạng lại (`isConnected`) → gọi lại fetch của màn đang mở.
+  4. Khoá bind: slot `claim` unit trước khi vẽ, nhả khi view của unit đó rời composition. Ad slot khác đang giữ thì
+     không được chọn để mượn. Màn đang rời giữ ad tới lúc dispose, màn mới hiện shimmer chờ.
+  5. Pager: chỉ trang `settledPage` mới chọn/mượn ad. Trang kề (±1) chỉ vẽ ad của chính placement như logic cũ (SDK tự
+     hiện shimmer khi đang load, chưa có thì trống), không mượn.
+  6. Lifecycle: ad mượn và trang kề vẽ dưới `GatedLifecycleOwner` kẹp ở `STARTED` → SDK không tự nạp lại và không xử lý
+     click `reload` cho ad đó. Trang kề lên làm trang chính: cùng owner, chỉ mở `RESUMED` ở lần `ON_RESUME` thật kế tiếp.
+  7. Click `next_screen` của mọi unit trong pool do `NativeClickActionEffect` của màn đang mở xử lý (ad mượn có thể là
+     của placement khác).
+  8. FSN (chỉ logic pool): tự sang trang sau 10 s (đếm khi màn `RESUMED`); không có ad và không đang load thì tự bỏ qua
+     trang. X vẫn theo `time_show_button_X_fsn`.
+  9. Buffer Language Alt (MO-98) giữ nguyên; logic pool không `reset()` buffer khi rời Language để ad còn cho mượn
+     (logic cũ vẫn reset).
+- **Bẫy** (A052, 10/2026):
+  - 2 view cùng 1 `NativeAd`: AdMob tính impression/click cho view gắn sau cùng, view cũ `destroy()` có thể gỡ luôn bản
+    mới. Phải khoá bind (bước 4), và luôn để view cũ dispose xong mới bind view mới.
+  - Vẽ ad mượn với lifecycle thật: `reloadWhenResume` của nameSpace cho mượn (`onboard_x` = true) bắn `loadAd` ngay lúc
+    vẽ → thêm 1 lượt load song song, phá luật 1 lượt load.
+  - Đổi owner từ kẹp sang thật lúc trang kề lên trang chính → SDK nhận `ON_RESUME`, reload ad vừa có impression lúc
+    trượt vào (2 impression trong chưa tới 1 s). Phải giữ cùng owner, chỉ mở `RESUMED` ở resume thật sau đó.
+  - Bản đầu cho trang kề hiện khung xám đứng yên (không bind) → PO thấy khó chịu, quay về trang kề hiện ad của chính
+    nó như logic cũ.
+  - Bỏ preload 2 trang thì trang kế trống lúc trượt vào → thêm nạp sẵn soft 1 trang khi ad trang hiện tại đã có.
+  - Offline thì `fetch` bỏ qua và không ai gọi lại → phải gọi lại khi có mạng (bước 3).
+  - `statusFlow` của SDK phát từ thread IO; đọc `status` trong composition không tự vẽ lại → cần map snapshot (bước 1).
+  - Bản thử ẩn nút Next/Skip 2–3 s (spec có) bị PO bỏ: nút hiện ngay ở cả 2 logic.
+  - Chưa sửa (có từ trước): vào OB1 sau transition Nav3 (`STARTED` → `RESUMED`), SDK reload `onboard_1` ngay sau
+    impression đầu → 2 impression. Sửa được cùng cách bước 6 nếu MO muốn.
+  - RC `ads_config` đè file local (`useLocalAdsConfig = false`): pool không thêm placement nhưng các mục khác cùng đợt
+    có thêm, nhớ đưa lên Firebase.
+  - App có impression flow 1px (MO-64..67): trang kề vẫn vẽ ad của chính nó nên còn impression trang kề; ad mượn chỉ ở
+    trang chính.
+  - Spec còn các phần A052 chưa làm: tái dùng inter splash chưa hiện làm inter lúc rời Language, tắt app-open trong
+    FO, màn select, màn resume, event telemetry riêng.
+- **QC**:
+  - Bản release (ad thật): vào OB1 lúc ad OB1 chưa có → thấy tạm ad màn trước rồi tự đổi sang ad OB1.
+  - Kéo chậm giữa 2 trang: trang kế đã có ad, không khung xám; dừng hẳn không reload. Logcat mỗi trang 1
+    `iaa_impression`, trang kế không có impression trước khi hiện.
+  - Ở trang FSN tắt mạng, chờ tự sang OB3: popup mất mạng, OB3 vẫn có ad mượn; bật mạng → đổi sang ad OB3.
+  - Ra nền rồi quay lại ở trang OB: ad nạp lại như cũ.
+  - `native_pool_logic = false`: log load giống logic cũ (Alt nạp OB đầu + FSN; đổi trang nạp lại trang trước + 2 trang
+    sau); FSN không tự sang trang, không ad thì X hiện ngay.
+  - `lock_swipe_ob = true`: không vuốt được trang nào, kể cả trang cuối; chỉ đi bằng nút.
+  - Bản debug: `adb logcat | grep NativeAdPool` thấy `fetch soft` / `urgent` / `soft dropped` / `refused`.

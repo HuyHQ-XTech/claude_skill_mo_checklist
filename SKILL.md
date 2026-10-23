@@ -1,11 +1,11 @@
 ---
 name: mo-checklist
-description: Làm / kiểm tra MO checklist (tactic Monetization) cho các app Android xTech theo MỘT cách chuẩn chung (ref mặc định A013 + SDK xtechads). Dùng khi user gõ /mo-checklist, nhắc "MO checklist", "MO tactic/tatic", "làm MO", "check MO", "MO request", gọi mục bằng ID kiểu "MO-82", "MO checklist 82", "checklist MO 88 + 90", hoặc nêu tên một tactic MO như noti lock screen, pinned/kill-app/daily/win-back/shortcut noti, uninstall shortcut, widget, open with, splash ads, language/language alt, select alt, onboard native full, toast sau click ads, inter khi back/vuốt, preload inter theo interval, loading trước inter/ads, rating. Hỗ trợ làm 1 mục lẻ trong app đã có MO cũ, audit app còn thiếu mục nào, giải thích mục cho PO/QC, cập nhật catalog khi MO thêm mục, và tự cập nhật bản skill mới (/mo-checklist update). KHÔNG dùng để tạo app mới (init-base-project), chỉ sửa ads_config/placement (skill ads), hay xử lý bug ticket chung (product-hub).
+description: Làm / kiểm tra MO checklist (tactic Monetization) cho các app Android xTech theo MỘT cách chuẩn chung (ref mặc định A013 + SDK xtechads). Dùng khi user gõ /mo-checklist, nhắc "MO checklist", "MO tactic/tatic", "làm MO", "check MO", "MO request", gọi mục bằng ID kiểu "MO-82", "MO checklist 82", "checklist MO 88 + 90", hoặc nêu tên một tactic MO như noti lock screen, pinned/kill-app/daily/win-back/shortcut noti, uninstall shortcut, widget, open with, splash ads, language/language alt, select alt, onboard native full, toast sau click ads, inter khi back/vuốt, preload inter theo interval, loading trước inter/ads, rating, gộp RC / gộp key Remote Config vào JSON theo màn. Hỗ trợ làm 1 mục lẻ trong app đã có MO cũ, audit app còn thiếu mục nào, giải thích mục cho PO/QC, cập nhật catalog khi MO thêm mục, và tự cập nhật bản skill mới (/mo-checklist update). KHÔNG dùng để tạo app mới (init-base-project), chỉ sửa ads_config/placement (skill ads), hay xử lý bug ticket chung (product-hub).
 ---
 
 # mo-checklist — làm MO checklist đồng bộ cho các app Android xTech
 
-Phiên bản **2.0.0** (2026-10-15) — thay đổi ghi ở `CHANGELOG.md`. Skill phân phối qua git: `/mo-checklist update` để
+Phiên bản **2.2.0** (2026-10-23) — thay đổi ghi ở `CHANGELOG.md`. Skill phân phối qua git: `/mo-checklist update` để
 kéo bản mới (xem `README.md`).
 
 Trước đây mỗi app tự làm MO checklist theo một kiểu, mỗi ticket lại "Ref" một app khác. Skill này là
@@ -48,6 +48,7 @@ bản hiện tại trên máy**. Lý do: A013 còn cập nhật liên tục, cod
 | `/mo-checklist P3563` (kèm nội dung ticket) | apply theo ticket Product Hub |
 | `/mo-checklist audit` · `/mo-checklist audit noti` | app hiện tại đang có/thiếu mục nào |
 | `/mo-checklist explain MO-78` | giải thích mục cho PO/QC/dev |
+| `/mo-checklist gộp RC` | apply `EXT-RC-GROUP`: hỏi cách đặt tên field (giống key RC cũ / tên mới rút gọn), gộp, in RC đã chỉnh |
 | `/mo-checklist update-catalog <file.xlsx>` | (bảo trì) đồng bộ catalog khi MO sửa sheet |
 | `/mo-checklist update` | kéo bản skill mới nhất từ repo chung + in CHANGELOG mới |
 
@@ -91,7 +92,7 @@ python3 <skill>/scripts/catalog.py show <ID>
   và ghi rõ "chờ MO chốt Qx" trong báo cáo.
 
 ### 2. Chọn app ref và đọc code chuẩn bản hiện tại
-- Mặc định là **A013**. Mục có `canonical.app` khác (MO-85 → A045, EXT-AD-LOADING → A048; A013 không có tactic
+- Mặc định là **A013**. Mục có `canonical.app` khác (MO-85 → A045, EXT-AD-LOADING → A048, EXT-NATIVE-POOL → A052; A013 không có tactic
   đó) thì app đó thay A013 làm ref mặc định của mục; luật "ref ≠ A013" dưới đây chỉ áp khi user chọn ref khác.
 - Ref = aXXX khi user ghi `ref aXXX` trong lệnh, hoặc khi ticket ghi "Ref aXXX" và **user xác nhận** dùng.
 - **Khi ref ≠ A013:**
@@ -202,6 +203,8 @@ python3 <skill>/scripts/audit.py --item <ID> --app a013 --app <ref>
   A013.
 - Cuối cùng 1 dòng để dán vào sheet MO: `MO-xx | <tên> | <app> v<version> | Done/Partial | <ghi chú>`. Mục `EXT-*`
   ghi `EXT-<TÊN> (ngoài sheet) | …` để MO biết chưa có dòng tương ứng.
+- Mục `EXT-RC-GROUP` (gộp RC): cuối báo cáo in khối RC đã chỉnh cho từng parameter (`key:` / `type: json` /
+  `value:` JSON mặc định 1 dòng), mẫu ở recipe `setup.md` § EXT-RC-GROUP bước 10.
 
 ## audit
 ```bash
@@ -281,11 +284,11 @@ Dùng `catalog.py show <ID>` + section recipe, rồi giải thích bằng lời 
 
 | Nhóm | File | Mục (ví dụ) |
 |---|---|---|
-| setup | `references/setup.md` | MO-5..20, MO-100, DEV-3 |
+| setup | `references/setup.md` | MO-5..20, MO-100, DEV-3, EXT-RC-GROUP |
 | splash | `references/splash.md` | MO-21..31, 84, 96, 97, 99 |
 | language | `references/language.md` | MO-32..42, 86, 94, 98, DEV-6/8/9 |
 | select | `references/select.md` | MO-43..51, DEV-10 |
-| onboard | `references/onboarding.md` | MO-52..67, 92 |
+| onboard | `references/onboarding.md` | MO-52..67, 92, EXT-NATIVE-POOL |
 | noti | `references/notifications.md` | MO-4, 68..73, 75, 87..89, 95 |
 | reopen | `references/reopen.md` | MO-74, 76..78, 91 |
 | ads | `references/inapp-ads.md` | MO-79..82, 93, DEV-16, DEV-21, EXT-AD-LOADING |
