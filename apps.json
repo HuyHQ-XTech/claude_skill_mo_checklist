@@ -116,6 +116,14 @@
    "dir": "A049_Palm-AI",
    "remote": "git@github.com:xTech-Android/A049_Palm-AI.git"
   },
+  "a052": {
+   "name": "Horae Tarot",
+   "dir": "A052_Tarot-2_Nuclear-Man",
+   "aliases": [
+    "a52"
+   ],
+   "remote": "git@github.com:xTech-Android/A052_Tarot-2_Nuclear-Man.git"
+  },
   "sdk": {
    "name": "xTechSDK (xtechads)",
    "dir": "xTechSDK",

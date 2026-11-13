@@ -1,5 +1,35 @@
 # CHANGELOG — skill mo-checklist
 
+## 2.2.0 — 2026-10-23
+
+Thêm mục ngoài sheet sau khi gộp RC ở A052 Horae Tarot v1.0.3 (đối chiếu A052 `b3701fb`, xtechads 1.8.3).
+
+- **`EXT-RC-GROUP`** — gộp key Remote Config phẳng của từng màn vào 1 parameter JSON (`splash_config`,
+  `language_config`, `onboard_config`, `noti_config`, `rate_config`…). Gọi bằng `/mo-checklist gộp RC` hoặc nhắc
+  "gộp key RC", "merge RC".
+  - Trước khi code hỏi user 5 quyết định. Quan trọng nhất là **cách đặt tên field**: giống tên key RC cũ (JSON phẳng,
+    A052, khuyên dùng) hay tên mới rút gọn có object lồng (A045, a037, a027). Các câu còn lại: phạm vi, cắt hay fallback
+    key cũ, default = Firebase hay default code cũ, unit test.
+  - Làm xong **bắt buộc in khối RC đã chỉnh** cho MO: mỗi parameter 1 khối `key:` / `type: json` / `value:` (JSON mặc
+    định 1 dòng), kèm lưu ý dựng lại A/B và không ghi đè parameter JSON đã có.
+  - Recipe `setup.md` § EXT-RC-GROUP: đọc Firebase đang chạy để chọn default và bắt A/B, script đối chiếu getter ↔ JSON
+    ↔ key cũ, verify máy 3 lượt, khung tài liệu + cột Version note của sheet Remote config. Kèm các bẫy đã gặp: condition
+    thay cả JSON, SDK lưu RC theo kiểu đoán, fetch đè key test, script Excel tạo dòng trùng số.
+- `conventions.md` §1 và `SKILL.md` (cách gọi, báo cáo, bản đồ tài liệu) trỏ tới mục mới.
+
+## 2.1.0 — 2026-10-22
+
+Thêm mục ngoài sheet sau khi làm A052 Horae Tarot v1.0.3, ticket P5210 (đối chiếu A052 `9572d22`, xtechads 1.8.3).
+
+- **`EXT-NATIVE-POOL`** — native pool dùng chung luồng Language/Onboard: slot thiếu ad thì mượn ad đã load của
+  placement khác (ưu tiên ad của chính slot → ad đã load chưa hiện mới nhất → ad đã hiện gần nhất → shimmer), mỗi lúc
+  1 lượt load (request lúc mở/resume màn bị bỏ khi đang có load khác), giữ ad cũ tới khi ad mới xong, nạp sẵn 1 trang
+  kế. Ref A052, RC `native_pool_logic` (bật/tắt cả logic, `false` = logic cũ) và `lock_swipe_ob` (khoá vuốt Onboard).
+  Recipe `onboarding.md` § EXT-NATIVE-POOL, kèm các bẫy đã gặp: 2 view cùng 1 `NativeAd`, ad mượn tự reload theo
+  `reloadWhenResume`, reload ngay sau impression khi trang kề lên trang chính.
+- `apps.json`: thêm `a052` (`A052_Tarot-2_Nuclear-Man`).
+- `onboarding.md` § Tổng quan nhóm: trỏ tới EXT-NATIVE-POOL ở phần preload xuyên trang.
+
 ## 2.0.0 — 2026-10-15
 
 Cập nhật sau khi làm MO checklist cho A049 Palm AI (noti ref A047; splash, language, onboarding, uninstall, inter ref

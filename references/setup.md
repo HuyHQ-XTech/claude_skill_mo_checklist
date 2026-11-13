@@ -1,4 +1,4 @@
-# Setup — SDK, consent, Firebase, revenue (MO-5..MO-20, MO-100)
+# Setup — SDK, consent, Firebase, revenue (MO-5..MO-20, MO-100, EXT-RC-GROUP)
 
 > Recipe đối chiếu lần cuối với A013 commit `f784827` (branch v1.2.7, xtechads 1.8.2) và source xTechSDK (nhánh `fix_native`, có thể mới hơn 1.8.2). Skill **không chép code**: mọi chi tiết code đọc từ A013 bản hiện tại theo file + symbol nêu dưới.
 > Ghi chú Ref A047/A048, "App đã làm: A049" và các đoạn ghi "10/2026" đối chiếu ngày 15/10/2026: A47 `61711d3` (xtechads 1.7.5), A048 `fcecc4a` (1.7.6), A049 `78a9c9b` + thay đổi chưa commit (1.8.7), source xTechSDK nhánh `main` (1.8.5 + "support a049") và AAR 1.8.7.
@@ -14,7 +14,7 @@
 4. Mọi `AdGroupUnit.loadAd` bị chặn bởi `canLoadAd` (= `canShowAds` và có mạng; `canShowAds` = `umpAllowed` và chưa mua `isPurchase`; `umpAllowed` = `canRequestAds()` hoặc `privacyOptionsRequirementStatus` khác REQUIRED) → gọi load khi offline, hoặc khi UMP đã biết cần consent mà chưa có = status `FAIL` ngay. Lúc `requestConsentInfoUpdate` chưa trả về hoặc lỗi (status UNKNOWN) thì `umpAllowed` = true → request **vẫn đi** dù chưa consent (MO-9, MO-22).
 5. Doanh thu IAA: mỗi `OnPaidEvent` trong ad unit SDK → `RevenueManager.logAdRevenue` fan-out 3 đích: AppsFlyer (`logAdRevenue`), Firebase `in_app_ad_impression`, Facebook `AdImpression`. Doanh thu IAP: SDK **không** làm, app tự log.
 
-**Các mục liên quan nhau:** danh tính app MO-6 (package) · MO-7 (AdMob App ID) · MO-11 (Facebook ID); consent MO-8 · MO-9 · MO-10 (luồng splash ở MO-22/MO-24); SDK quảng cáo/attribution MO-12 · MO-13 · MO-14 · MO-15 · MO-18 · MO-5 (billing); Firebase MO-16 · MO-17 (cổng chờ RC ở splash: MO-27); build/layout MO-19 · MO-20. MO-100 là checklist tích hợp SDK tổng. Init song song / tối ưu init: DEV-3 và MO-97 nằm ở `splash.md`.
+**Các mục liên quan nhau:** danh tính app MO-6 (package) · MO-7 (AdMob App ID) · MO-11 (Facebook ID); consent MO-8 · MO-9 · MO-10 (luồng splash ở MO-22/MO-24); SDK quảng cáo/attribution MO-12 · MO-13 · MO-14 · MO-15 · MO-18 · MO-5 (billing); Firebase MO-16 · MO-17 (cổng chờ RC ở splash: MO-27); build/layout MO-19 · MO-20. MO-100 là checklist tích hợp SDK tổng. Gộp key RC phẳng sang JSON theo màn: EXT-RC-GROUP (cuối file). Init song song / tối ưu init: DEV-3 và MO-97 nằm ở `splash.md`.
 
 **Hạ tầng dùng chung ở A013:** `di/Modules.kt` (`appModule`: `SharedPrefs` bind `XtechSharedPref`; `adsModule`: `AppConfig` + `AdsManager` `createdAtStart` bind `BaseAds`), `App.kt` (`startKoin`, `initFCM`, `remoteConfig.fetchRemoteConfig()`), `MainActivity.kt`, `ads/AdsManager.kt`, `domain/preference/SharedPrefs.kt` (mọi key RC = 1 property `SharedPreferenceProperty("<key>", default)`; RC manager ghi mọi key REMOTE vào cùng file prefs `packageName`), `app/config/ads_config.json` (plugin `com.xtech.ads` mã hoá thành `assets/ads_config.dat`; RC key `ads_config` đè toàn bộ).
 
@@ -246,3 +246,129 @@ Kiểm nhanh: grep tên getter trong `xTechSDK/xtechads/src/main`.
   - Ref A047/A048 khác A013: `AdsManager` không `createdAtStart` (A47, A048 `singleOf(::AdsManager)`; base project và A049 khai `single` có kiểm main thread) — lệch dòng Koin của nghiệm thu, xem MO-97.
 - **Bẫy:** thiếu `AdHostActivity` → app-open resume không chạy; `AdsManager` không `createdAtStart` (a037 `singleOf(::AdsManager)`) → lifecycle callback gắn muộn; `SharedPrefs` cũ khác file prefs (`packageName`) → mất data user khi migrate; plugin và AAR lệch version (A034 từng 1.2.1 vs 1.3.4); không ai gọi `requestUMP` (vd tạm bỏ lúc dựng app rồi quên bật lại) → `consentFinished` không bao giờ bật: splash không load ad, không hỏi noti, đứng mãi (hoặc tới trần tổng nếu có) — dấu hiệu: logcat không có dòng `requestUMP:`. Build release crash lúc mở / test ad debug luôn fail: xem Tổng quan nhóm.
 - **QC:** chạy release: UMP → inter splash → log `trackIaaRequest` / `trackIaaLoaded` / `trackIaaImpression`; DebugView `sdk_init` có `ump_finish`, `mobile_ads_finish`, `remote_config`, `appsflyer`; build release cài lên máy, mở lạnh → `adb logcat -b crash` rỗng.
+
+## EXT-RC-GROUP — Gộp key Remote Config theo màn vào parameter JSON — ngoài sheet
+
+> Không có dòng trong sheet MO nên không có MO-ID. Skill nhận mục này qua prompt ("gộp RC", "gộp key RC", "merge RC",
+> "RC group"…). Nguồn: A052 Horae Tarot v1.0.3 (commit `b3701fb` "v1.0.3 merge RC"), làm theo mẫu A045 1.0.9, a037,
+> a027. Dòng dán sheet MO ghi `EXT-RC-GROUP (ngoài sheet)`. Để ở nhóm setup vì đụng RC của mọi màn.
+
+- **Yêu cầu**: mỗi màn / tính năng chỉ dùng **một parameter kiểu JSON** trên Firebase (`splash_config`,
+  `language_config`, `onboard_config`, `noti_config`, `rate_config`…) thay cho nhiều key phẳng. MO sửa 1 chỗ cho cả màn;
+  condition và A/B test làm trên 1 parameter.
+- **Nghiệm thu**:
+  - Không tạo parameter nào trên Firebase thì app chạy y như hiện tại: default trong code = giá trị Firebase đang chạy
+    (trừ khi user chọn khác ở câu hỏi 4).
+  - Field thiếu, sai kiểu, JSON hỏng, hay parameter bị lưu thành số / boolean: dùng default, không crash, log 1 lần.
+  - Getter trong `SharedPrefs` giữ nguyên tên và kiểu cũ nên chỗ gọi không phải sửa.
+  - Tên field theo option user chọn ở câu hỏi 1.
+  - Có tài liệu RC của app, CLAUDE.md và sheet "Remote config" của file checklist PO đã cập nhật.
+  - Báo cáo cuối **in khối RC đã chỉnh** theo mẫu ở bước 10.
+- **Hỏi user trước khi code.** Đây là quyết định của owner, không tự chọn. Dùng AskUserQuestion, tối đa 4 câu mỗi lần:
+  câu 1–4 trước, câu 5 hỏi sau hoặc theo mặc định khuyên.
+  1. **Đặt tên field trong JSON** (bắt buộc hỏi):
+     - *Giống tên key RC cũ* (khuyên dùng, A052): field = đúng tên key phẳng cũ, vd `onboard_config.enable_onboard_1`,
+       `noti_config.noti_lockscreen_slots`. JSON phẳng 1 tầng, không lồng object. MO chép giá trị key cũ sang JSON,
+       không phải tra bảng đổi tên. Đổi lại tên dài, lặp tiền tố của nhóm.
+     - *Tên mới rút gọn* (A045, a037, a027): bỏ tiền tố trùng nhóm, gom object lồng, vd `onboard_config.enable_ob1`,
+       `splash_config.native_full.countdown_time`, `noti_config.lockscreen.slots`. JSON gọn, nhưng tài liệu phải có cột
+       "Thay cho" và MO/QC phải tra bảng. A052 làm kiểu này trước, owner xem xong yêu cầu đổi lại tên cũ.
+  2. **Phạm vi**: gộp mọi nhóm, hay chỉ một số màn (vd luồng first-open).
+  3. **Key phẳng cũ**: cắt hẳn, bản mới chỉ đọc JSON (khuyên, như A045 / a037 / a027 / A052); hay đọc JSON trước rồi
+     fallback key phẳng.
+  4. **Default trong code**: = giá trị Firebase đang chạy (khuyên); hay giữ default code cũ.
+  5. **Kiểm thử**: chỉ verify trên máy (A052); hay thêm unit test cho `RcGroup` (A045 `RcGroupTest`).
+- **SDK**: xtechads không có API nhóm RC. `RemoteConfigManager` (`xtechcore`) ghi mọi key có trên server xuống prefs
+  `<applicationId>` theo kiểu đoán Long → Double → Boolean → String; không xoá key cũ, không ghi key không có trên
+  server. Hệ quả:
+  - Parameter JSON mà MO nhập thành số hoặc `true` thì `getString` ném lỗi, nên đọc nhóm phải bắt lỗi.
+  - Key test tiêm vào prefs sẽ bị fetch đè nếu key đó có trên server.
+- **Chuẩn của mục này = A052** (A013 không gộp RC). Đường dẫn tính từ `app/src/main/java/com/ai/live/tarot2/`:
+  - `domain/preference/RcGroup.kt`: đọc 1 parameter JSON theo tên field (`string` / `long` / `bool` / `list`, path chấm
+    cho object lồng).
+    - Cache theo chuỗi gốc; mọi lỗi trả null để getter rơi về default.
+    - Log 1 lần khi parameter sai kiểu lưu hoặc không phải JSON object.
+    - Số nhận cả dạng chuỗi (`"3"`), không nhận số thập phân; boolean nhận `true/false`, `1/0`; list nhận mảng hoặc
+      chuỗi phẩy.
+  - `domain/preference/SharedPrefs.kt`: mỗi nhóm 1 khối `/** Start xxx_config *** {JSON mặc định đầy đủ} */` …
+    `/** End xxx_config */`. Trong khối là `RcGroup("xxx_config", ::getString)` và các getter cũ đọc field kèm default.
+    Khối comment là ngoại lệ có chủ đích của luật "không comment": dev / MO / QC tra cấu trúc JSON ở đây; sửa field
+    thì sửa comment trong cùng commit.
+  - `docs/remote-config-group.md` (gốc repo): tài liệu cho MO / QC.
+  - Option tên mới rút gọn: xem A045 `docs/features/remote-config-group.md` và `domain/preference/RcGroup.kt` (thêm
+    `json(path)` trả JSON con dạng chuỗi), a037 `docs/remote-config-group.md` §5.
+- **Remote config**:
+  - Parameter `<màn>_config`, data type JSON trên Firebase.
+  - Parameter JSON đã có từ trước (vd `language_config`) thì giữ field cũ, chỉ thêm field mới vào.
+  - Để phẳng, không gộp:
+    - key SDK tự đọc theo tên (`ads_config`, `af_*`, xem § Tổng quan nhóm);
+    - key ads dùng ở nhiều màn (interval inter, preload inter, reload native in-app, `click_ad_action`);
+    - flag lẻ 1 key cho 1 tính năng (vd A/B UI exit `exit_ui_type`);
+    - config server (host, API key).
+- **Placement / tracking**: không đổi.
+- **Cách làm**:
+  1. Kiểm kê key RC phẳng: delegate `SharedPreferenceProperty` trong `SharedPrefs` và chỗ khác đọc RC theo chuỗi. Tách
+     riêng key state local (đếm, cờ đã hiện…), không phải RC.
+  2. Chia nhóm theo màn / tính năng; chốt danh sách key để phẳng.
+  3. Đối chiếu key đã lên store: `git show origin/main:<đường dẫn SharedPrefs>` và các nhánh release `v<x>`. Phân loại
+     key đã phát hành / chỉ có ở nhánh chưa phát hành. Dùng cho mục "chuyển key cũ" và cột Version note.
+  4. Đọc Firebase đang chạy: file `files/frc_*_firebase_activate.json` của app trên máy debug (`run-as`).
+     - Clear data vài lần để bắt các nhánh A/B (`abt_experiments_key` → `affectedParameterKeys`, `variantId`).
+     - Ghi lại template version.
+     - Không in hay ghi secret (`host_key`, API key) ra doc, sheet, báo cáo.
+  5. Code: thêm `RcGroup` (port từ A052 nếu app chưa có), viết khối nhóm, bỏ delegate key phẳng. Default theo câu 4.
+  6. Đối chiếu tự động bằng script tạm trong scratchpad, không commit:
+     - mỗi getter có field trong JSON của khối comment, và ngược lại;
+     - fallback trong code = giá trị trong JSON;
+     - option "giống tên key cũ": mọi field (trừ field vốn có của parameter cũ) trùng 1 key phẳng cũ.
+  7. Build, chạy grep convention của app.
+  8. Verify trên máy 3 lượt:
+     - chỉ có key phẳng → bản mới bỏ qua;
+     - tiêm JSON đủ field khác default → hành vi đổi đúng;
+     - sai kiểu: parameter lưu thành số, chuỗi `{broken`, boolean → không crash, về default, log 1 lần.
+
+     Tiêm bằng cách sửa prefs `<applicationId>.xml`: force-stop → pull → sửa → push qua `run-as`. Dùng parameter chưa có
+     trên Firebase để fetch không đè. Xong thì gỡ key test.
+  9. Tài liệu:
+     - `docs/remote-config-group.md` theo khung A052 / A045: tóm tắt, quyết định, bảng field (option tên mới thêm cột
+       "Thay cho"), key để phẳng, chuyển key cũ, giá trị Firebase + việc MO, QC, checklist, log;
+     - CLAUDE.md của app;
+     - sheet "Remote config" (`conventions.md` §1). Cột Version note: key cũ "Từ vX · vY chuyển vào xxx_config (giữ
+       tên field)" hoặc "… vY thay bằng xxx_config.<field>"; key chưa từng phát hành "Không bản nào dùng · …";
+       parameter nhóm "Từ vY".
+  10. **In RC đã chỉnh** (bắt buộc, cuối báo cáo). Mỗi parameter 1 khối; value là JSON mặc định viết gọn trên 1 dòng,
+      đúng thứ tự field trong khối comment:
+
+      ```text
+      key: language_config
+      type: json
+      value: {"priority_languages": ["system", "en", "es"], "finger_position": 1, "buffer_language_alt": true}
+
+      key: onboard_config
+      type: json
+      value: {"enable_onboard_1": true, "enable_onboard_2": true, "time_show_button_X_fsn": 3}
+      ```
+
+      Kèm lưu ý cho MO:
+      - parameter đã có trên Firebase → thêm field vào JSON hiện có;
+      - A/B đang chạy trên key phẳng → dựng lại trên parameter mới;
+      - 1 condition thay cả JSON.
+- **Bẫy**:
+  - Condition / A/B trên key phẳng mất tác dụng khi cắt key. MO phải dựng lại trên parameter mới (A052: `_exp_abt_2`
+    trên `enable_onboard_3` / `enable_onboard_4` → `onboard_config`; A045: `logic_pass_splash` → `splash_config`).
+  - Default code cũ thường lệch Firebase (A052 lệch 5 key, A045 lệch 9). Đọc Firebase trước khi chọn default.
+  - Một condition Firebase thay **cả JSON**: field nào muốn khác default phải ghi đủ trong JSON của condition đó.
+  - Parameter JSON đã có (vd `language_config`): tạo lại JSON chỉ có field mới là mất field cũ.
+  - SDK lưu theo kiểu đoán: JSON nhập thành số / boolean làm `getString` ném lỗi, nên `RcGroup` phải bắt lỗi.
+  - Test: key có trên Firebase bị fetch đè sau khi tiêm prefs.
+  - Field số không nhận số thập phân (`3.5` → default).
+  - Option tên mới rút gọn: MO / QC dễ dò nhầm key cũ với field mới. A052 phải đổi lại tên sau khi đã gửi MO → luôn hỏi
+    câu 1 trước khi code.
+  - Script sửa file Excel: dòng có sẵn có thể ghi `r` sau thuộc tính khác (`<row customHeight="true" … r="195">`). Dò
+    dòng phải nhận cả dạng này, không thì tạo dòng trùng số và Excel báo file lỗi.
+- **QC**:
+  - Không tạo parameter nào: app chạy đúng mặc định = hành vi Firebase hiện tại.
+  - Tạo parameter với 1 field khác default (vd tắt 1 trang Onboard): chỉ hành vi đó đổi.
+  - Sai kiểu (`123`, `{broken`): không crash, về mặc định.
+  - Chỉ còn key phẳng cũ (vd tắt Skip OB2), không có parameter nhóm: bản mới **không** ăn key cũ.
+  - A/B dựng lại trên parameter mới: mỗi nhánh nhận đúng giá trị (đọc `frc_*_firebase_activate.json`).
